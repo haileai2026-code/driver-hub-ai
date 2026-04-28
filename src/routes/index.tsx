@@ -515,6 +515,11 @@ function HaileApp() {
                 onFile={handleImportFile}
                 onImport={runCandidateImport}
                 onAi={runAi}
+                form={candidateForm}
+                onFormChange={setCandidateForm}
+                onSaveCandidate={saveCandidate}
+                onStageChange={updateSelectedStage}
+                actionStatus={actionStatus}
                 aiText={aiText}
                 isAiLoading={isAiLoading}
               />
@@ -524,8 +529,8 @@ function HaileApp() {
             {activePage === "sol" && <SolPage />}
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
-            {activePage === "settings" && <SettingsPage />}
-            {activePage === "admin" && <AdminUsersPage />}
+            {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
+            {activePage === "admin" && <AdminUsersPage onInvite={handleInvite} status={actionStatus} />}
           </div>
         </section>
       </div>
