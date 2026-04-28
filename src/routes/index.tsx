@@ -684,6 +684,36 @@ function normalizeCandidate(row: CandidateRow): Candidate {
   };
 }
 
+async function parseImportFile(file: File): Promise<Record<string, string | number | boolean | null>[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", raw: false });
+  const sheetName = workbook.SheetNames[0];
+
+  if (!sheetName) {
+    throw new Error("הקובץ ריק או לא תקין.");
+  }
+
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<Record<string, string | number | boolean | null>>(sheet, {
+    defval: "",
+    raw: false,
+  });
+
+  const cleanRows = rows
+    .map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key.trim(), typeof value === "string" ? value.trim() : value]),
+      ),
+    )
+    .filter((row) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
+
+  if (cleanRows.length === 0) {
+    throw new Error("לא נמצאו שורות מועמדים בקובץ.");
+  }
+
+  return cleanRows.slice(0, 500);
+}
+
 function normalizeName(value: Json, fallback: string): Record<Language, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { he: fallback, am: fallback, ru: fallback };
