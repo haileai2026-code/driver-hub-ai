@@ -855,6 +855,35 @@ function AgentsPage() {
   );
 }
 
+function QuickCandidateForm({
+  form,
+  onChange,
+  onSave,
+}: {
+  form: CandidateForm;
+  onChange: (form: CandidateForm) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <SmallInput label="שם מלא" value={form.name} onChange={(name) => onChange({ ...form, name })} />
+        <SmallInput label="טלפון" value={form.phone} onChange={(phone) => onChange({ ...form, phone })} />
+        <SmallInput label="גיל" value={form.age} onChange={(age) => onChange({ ...form, age })} />
+        <SmallSelect label="עיר" value={form.city} options={["Ashkelon", "Kiryat Gat"]} onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })} />
+        <SmallSelect label="שפה" value={form.language} options={["he", "am", "ru"]} onChange={(language) => onChange({ ...form, language: language as CandidateForm["language"] })} />
+        <SmallSelect label="שלב" value={form.stage} options={["Lead", "Learning", "Test", "Placed"]} onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })} />
+      </div>
+      <SmallInput label="הערה" value={form.note} onChange={(note) => onChange({ ...form, note })} />
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <label><input type="checkbox" checked={form.idDocument} onChange={(event) => onChange({ ...form, idDocument: event.target.checked })} /> תעודת זהות</label>
+        <label><input type="checkbox" checked={form.greenForm} onChange={(event) => onChange({ ...form, greenForm: event.target.checked })} /> טופס ירוק</label>
+      </div>
+      <Button variant="command" onClick={onSave}><Save className="h-4 w-4" /> שמור מועמד</Button>
+    </div>
+  );
+}
+
 function SolPage() {
   return (
     <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
