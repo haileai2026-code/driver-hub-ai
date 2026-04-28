@@ -194,7 +194,12 @@ function Index() {
     "בחר מועמד אמיתי מהרשימה כדי להפעיל את שכבת ה-AI הרב-לשונית.",
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [importRows, setImportRows] = useState<Record<string, string | number | boolean | null>[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importStatus, setImportStatus] = useState("CSV / Excel: full_name, שם בעברית, שם באמהרית, שם ברוסית, phone, city.");
+  const [isImporting, setIsImporting] = useState(false);
   const generateText = useServerFn(generateHaileAiText);
+  const importCandidates = useServerFn(importCandidatesFromRows);
   const t = copy[language];
 
   useEffect(() => {
@@ -238,6 +243,17 @@ function Index() {
       active = false;
     };
   }, []);
+
+  const refreshCandidates = async () => {
+    const { data, error } = await supabase.from("candidates").select("*").order("created_at", { ascending: false });
+    if (error) {
+      setImportStatus(error.message);
+      return;
+    }
+    const realCandidates = (data ?? []).map(normalizeCandidate);
+    setCandidates(realCandidates);
+    setSelectedId(realCandidates[0]?.id ?? null);
+  };
 
   const selected =
     candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0] ?? null;
@@ -285,6 +301,45 @@ function Index() {
       setAiText(result.text);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const rows = await parseImportFile(file);
+      setImportRows(rows);
+      setImportFileName(file.name);
+      setImportStatus(`${t.importReady}: ${rows.length} שורות זוהו עם מיפוי אוטומטי.`);
+    } catch (error) {
+      setImportRows([]);
+      setImportFileName("");
+      setImportStatus(error instanceof Error ? error.message : "לא ניתן לקרוא את הקובץ.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const runCandidateImport = async () => {
+    if (importRows.length === 0) return;
+    setIsImporting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setImportStatus("יש להתחבר לפני ייבוא מועמדים.");
+        return;
+      }
+
+      const result = await importCandidates({ data: { accessToken, rows: importRows } });
+      setImportStatus(`${t.importDone}: ${result.inserted} נשמרו, ${result.skipped} דולגו${result.errors.length ? ` · ${result.errors.slice(0, 3).join(" · ")}` : ""}`);
+      setImportRows([]);
+      setImportFileName("");
+      await refreshCandidates();
+    } finally {
+      setIsImporting(false);
     }
   };
 
