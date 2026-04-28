@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Database, TablesInsert } from "@/integrations/supabase/types";
 
 type CandidateInsert = TablesInsert<"candidates">;
+type CandidateImportDraft = Omit<CandidateInsert, "city"> & { city?: CandidateInsert["city"] };
 type Language = Database["public"]["Enums"]["preferred_language"];
 
 const CellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -52,7 +53,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
     }
 
     const errors: string[] = [];
-    const candidates = data.rows.flatMap((row, index) => {
+    const candidates: CandidateInsert[] = data.rows.flatMap((row, index) => {
       const mapped = mapImportRow(row);
       const rowNumber = index + 2;
 
@@ -66,7 +67,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
         return [];
       }
 
-      return [mapped];
+      return [mapped as CandidateInsert];
     });
 
     if (candidates.length === 0) {
@@ -85,7 +86,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
     };
   });
 
-function mapImportRow(row: Record<string, string | number | boolean | null>): CandidateInsert {
+function mapImportRow(row: Record<string, string | number | boolean | null>): CandidateImportDraft {
   const nameHe = read(row, headerMap.nameHe) || read(row, headerMap.name);
   const nameAm = read(row, headerMap.nameAm) || nameHe;
   const nameRu = read(row, headerMap.nameRu) || nameHe;
