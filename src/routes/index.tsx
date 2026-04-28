@@ -1091,11 +1091,13 @@ function CandidateCard({
 function CandidateProfile({
   candidate,
   onAi,
+  onStageChange,
   aiText,
   isAiLoading,
 }: {
   candidate: Candidate;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onStageChange: (stage: CandidateForm["stage"]) => void;
   aiText: string;
   isAiLoading: boolean;
 }) {
@@ -1123,6 +1125,11 @@ function CandidateProfile({
         {isAiLoading ? "AI מנתח..." : aiText}
       </div>
       <div className="flex flex-wrap gap-2">
+        {(["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
+          <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
+            {stageLabels[stage]}
+          </Button>
+        ))}
         <Button variant="command" onClick={() => onAi("candidate_next_step")}>
           <Bot className="h-4 w-4" /> הצע צעד הבא
         </Button>
