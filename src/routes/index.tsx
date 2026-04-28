@@ -15,13 +15,16 @@ import {
   RadioTower,
   Send,
   ShieldCheck,
+  UploadCloud,
   TrendingUp,
   UsersRound,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
 
 export const Route = createFileRoute("/")({
@@ -97,6 +100,10 @@ const copy = {
     translate: "תרגום ניהול לעברית",
     template: "סטטוס בשפת הנהג",
     askAi: "הצע צעד הבא",
+    importTitle: "ייבוא מועמדים",
+    importAction: "ייבא CSV / Excel",
+    importReady: "הקובץ מוכן לייבוא",
+    importDone: "ייבוא הושלם",
     emptyCandidates: "אין עדיין מועמדים במסד הנתונים.",
     emptyFinance: "אין עדיין רשומות כספים אמיתיות.",
     emptyAssets: "אין עדיין רכבי חברה במערכת.",
@@ -124,6 +131,10 @@ const copy = {
     translate: "ወደ ዕብራይስጥ ትርጉም",
     template: "በሹፌሩ ቋንቋ ሁኔታ",
     askAi: "ቀጣይ እርምጃ",
+    importTitle: "እጩዎችን አስመጣ",
+    importAction: "CSV / Excel አስመጣ",
+    importReady: "ፋይሉ ለማስመጣት ዝግጁ ነው",
+    importDone: "ማስመጣት ተጠናቋል",
     emptyCandidates: "በዳታቤዝ ውስጥ እጩዎች አልተገኙም።",
     emptyFinance: "የፋይናንስ መዝገቦች አልተገኙም።",
     emptyAssets: "የኩባንያ ተሽከርካሪዎች አልተገኙም።",
@@ -151,6 +162,10 @@ const copy = {
     translate: "Перевод на иврит",
     template: "Статус на языке водителя",
     askAi: "Следующий шаг",
+    importTitle: "Импорт кандидатов",
+    importAction: "Импорт CSV / Excel",
+    importReady: "Файл готов к импорту",
+    importDone: "Импорт завершен",
     emptyCandidates: "В базе пока нет кандидатов.",
     emptyFinance: "Финансовых записей пока нет.",
     emptyAssets: "Автомобилей компании пока нет.",
