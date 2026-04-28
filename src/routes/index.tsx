@@ -34,7 +34,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Haile AI Recruitment Command" },
       {
         property: "og:description",
-        content: "Hebrew, Amharic and Russian command center for candidate pipeline and management.",
+        content:
+          "Hebrew, Amharic and Russian command center for candidate pipeline and management.",
       },
     ],
   }),
@@ -120,7 +121,13 @@ const finance = [
 
 const assets = [
   { name: "Arrizo 8-01", plate: "912-44-301", mileage: 18420, service: "12.05", status: "active" },
-  { name: "Arrizo 8-02", plate: "912-44-302", mileage: 29880, service: "03.05", status: "service_due" },
+  {
+    name: "Arrizo 8-02",
+    plate: "912-44-302",
+    mileage: 29880,
+    service: "03.05",
+    status: "service_due",
+  },
   { name: "Arrizo 8-03", plate: "912-44-303", mileage: 12040, service: "28.06", status: "active" },
 ];
 
@@ -208,7 +215,9 @@ function Index() {
   const generateText = useServerFn(generateHaileAiText);
   const t = copy[language];
   const selected = candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0];
-  const missingCount = candidates.filter((candidate) => !candidate.documents.id || !candidate.documents.green).length;
+  const missingCount = candidates.filter(
+    (candidate) => !candidate.documents.id || !candidate.documents.green,
+  ).length;
 
   const metrics = useMemo(
     () => [
@@ -222,7 +231,10 @@ function Index() {
 
   const runAi = async (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => {
     setIsLoading(true);
-    const missingDocuments = [!selected.documents.id ? "ID" : "", !selected.documents.green ? "Green Form" : ""].filter(Boolean);
+    const missingDocuments = [
+      !selected.documents.id ? "ID" : "",
+      !selected.documents.green ? "Green Form" : "",
+    ].filter(Boolean);
     const result = await generateText({
       data: {
         mode,
@@ -232,9 +244,7 @@ function Index() {
         licenseStatus: selected.licenseStatus,
         missingDocuments,
         message:
-          mode === "translate_to_hebrew"
-            ? "እባክዎ ነገ እደውላለሁ፣ የግሪን ፎርም ሰነድ አሁን የለኝም።"
-            : selected.note,
+          mode === "translate_to_hebrew" ? "እባክዎ ነገ እደውላለሁ፣ የግሪን ፎርም ሰነድ አሁን የለኝም።" : selected.note,
       },
     });
     setAiText(result.text);
@@ -242,7 +252,10 @@ function Index() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground" dir={language === "he" ? "rtl" : "ltr"}>
+    <main
+      className="min-h-screen bg-background text-foreground"
+      dir={language === "he" ? "rtl" : "ltr"}
+    >
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
         <header className="glass-panel sticky top-4 z-10 flex flex-col gap-4 rounded-lg px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -250,8 +263,12 @@ function Index() {
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-primary">{t.command}</p>
-              <h1 className="font-display text-2xl font-black tracking-normal sm:text-3xl">{t.title}</h1>
+              <p className="text-xs font-semibold uppercase tracking-normal text-primary">
+                {t.command}
+              </p>
+              <h1 className="font-display text-2xl font-black tracking-normal sm:text-3xl">
+                {t.title}
+              </h1>
             </div>
           </div>
           <nav className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -284,7 +301,8 @@ function Index() {
                 {t.subtitle}
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                Pipeline, Ciel's Log, Scat's Ledger, assets, WhatsApp templates and AI translation in one operating picture.
+                Pipeline, Ciel's Log, Scat's Ledger, assets, WhatsApp templates and AI translation
+                in one operating picture.
               </p>
             </div>
           </div>
@@ -293,10 +311,15 @@ function Index() {
             {metrics.map((metric) => {
               const Icon = metric.icon;
               return (
-                <article key={metric.label} className="glass-panel rounded-lg p-5 transition duration-300 hover:-translate-y-1">
+                <article
+                  key={metric.label}
+                  className="glass-panel rounded-lg p-5 transition duration-300 hover:-translate-y-1"
+                >
                   <div className="mb-6 flex items-center justify-between">
                     <Icon className="h-5 w-5 text-primary" />
-                    <span className="rounded-sm bg-success/20 px-2 py-1 text-xs font-black text-success">{metric.delta}</span>
+                    <span className="rounded-sm bg-success/20 px-2 py-1 text-xs font-black text-success">
+                      {metric.delta}
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground">{metric.label}</p>
                   <strong className="mt-1 block text-3xl font-black">{metric.value}</strong>
@@ -313,7 +336,11 @@ function Index() {
                 <p className="text-sm font-bold text-primary">{t.ciel}</p>
                 <h2 className="text-2xl font-black">{t.pipeline}</h2>
               </div>
-              <Button variant="command" onClick={() => runAi("status_template")} disabled={isLoading}>
+              <Button
+                variant="command"
+                onClick={() => runAi("status_template")}
+                disabled={isLoading}
+              >
                 <Send className="h-4 w-4" /> {t.reminder}
               </Button>
             </div>
@@ -330,7 +357,9 @@ function Index() {
                       {candidate.city} · {candidate.phone} · {candidate.licenseStatus}
                     </p>
                   </div>
-                  <span className={`w-fit rounded-sm px-3 py-1 text-xs font-black ${stageTone[candidate.stage]}`}>
+                  <span
+                    className={`w-fit rounded-sm px-3 py-1 text-xs font-black ${stageTone[candidate.stage]}`}
+                  >
                     {candidate.stage}
                   </span>
                   <span className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -339,7 +368,8 @@ function Index() {
                     ) : (
                       <FileWarning className="h-4 w-4 text-warning" />
                     )}
-                    ID {candidate.documents.id ? "✓" : "—"} · Green {candidate.documents.green ? "✓" : "—"}
+                    ID {candidate.documents.id ? "✓" : "—"} · Green{" "}
+                    {candidate.documents.green ? "✓" : "—"}
                   </span>
                 </button>
               ))}
@@ -374,13 +404,20 @@ function Index() {
               {finance.map((row) => (
                 <div key={row.city} className="rounded-md border border-border bg-surface p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <strong>{row.city} · {row.company}</strong>
+                    <strong>
+                      {row.city} · {row.company}
+                    </strong>
                     <span className="text-xl font-black">₪{row.pending.toLocaleString()}</span>
                   </div>
                   <div className="h-3 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-warning" style={{ width: `${(row.pending / (row.pending + row.paid)) * 100}%` }} />
+                    <div
+                      className="h-full rounded-full bg-warning"
+                      style={{ width: `${(row.pending / (row.pending + row.paid)) * 100}%` }}
+                    />
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Pending vs received ledger balance</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Pending vs received ledger balance
+                  </p>
                 </div>
               ))}
             </div>
@@ -396,12 +433,19 @@ function Index() {
             </div>
             <div className="grid gap-3">
               {assets.map((asset) => (
-                <div key={asset.plate} className="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-border bg-surface p-4">
+                <div
+                  key={asset.plate}
+                  className="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-border bg-surface p-4"
+                >
                   <div>
                     <strong>{asset.name}</strong>
-                    <p className="text-sm text-muted-foreground">{asset.plate} · {asset.mileage.toLocaleString()} km</p>
+                    <p className="text-sm text-muted-foreground">
+                      {asset.plate} · {asset.mileage.toLocaleString()} km
+                    </p>
                   </div>
-                  <span className={`rounded-sm px-2 py-1 text-xs font-black ${asset.status === "service_due" ? "bg-warning/20 text-warning" : "bg-success/20 text-success"}`}>
+                  <span
+                    className={`rounded-sm px-2 py-1 text-xs font-black ${asset.status === "service_due" ? "bg-warning/20 text-warning" : "bg-success/20 text-success"}`}
+                  >
                     {asset.service}
                   </span>
                 </div>
@@ -434,13 +478,25 @@ function Index() {
               {isLoading ? "AI מנתח את המידע..." : aiText}
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Button variant="command" onClick={() => runAi("candidate_next_step")} disabled={isLoading}>
+              <Button
+                variant="command"
+                onClick={() => runAi("candidate_next_step")}
+                disabled={isLoading}
+              >
                 <Bot className="h-4 w-4" /> {t.askAi}
               </Button>
-              <Button variant="intel" onClick={() => runAi("translate_to_hebrew")} disabled={isLoading}>
+              <Button
+                variant="intel"
+                onClick={() => runAi("translate_to_hebrew")}
+                disabled={isLoading}
+              >
                 <Languages className="h-4 w-4" /> {t.translate}
               </Button>
-              <Button variant="tactical" onClick={() => runAi("status_template")} disabled={isLoading}>
+              <Button
+                variant="tactical"
+                onClick={() => runAi("status_template")}
+                disabled={isLoading}
+              >
                 <MessageSquareText className="h-4 w-4" /> {t.template}
               </Button>
             </div>
@@ -451,7 +507,15 @@ function Index() {
   );
 }
 
-function Info({ icon: Icon, label, value }: { icon: typeof UsersRound; label: string; value: string }) {
+function Info({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof UsersRound;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface p-3">
       <span className="flex items-center gap-2 text-muted-foreground">

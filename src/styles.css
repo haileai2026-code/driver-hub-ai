@@ -173,7 +173,11 @@
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(90deg, color-mix(in oklab, var(--rail) 10%, transparent) 1px, transparent 1px),
+      linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--rail) 10%, transparent) 1px,
+        transparent 1px
+      ),
       linear-gradient(180deg, color-mix(in oklab, var(--rail) 8%, transparent) 1px, transparent 1px);
     background-size: 58px 58px;
     mask-image: radial-gradient(circle at 50% 0%, black, transparent 72%);
@@ -204,19 +208,30 @@
     position: absolute;
     inset: -120% 0 auto;
     height: 90%;
-    background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--primary) 16%, transparent), transparent);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in oklab, var(--primary) 16%, transparent),
+      transparent
+    );
     animation: signal-sweep 7s linear infinite;
     pointer-events: none;
   }
 }
 
 @keyframes signal-sweep {
-  from { transform: translateY(-15%); }
-  to { transform: translateY(270%); }
+  from {
+    transform: translateY(-15%);
+  }
+  to {
+    transform: translateY(270%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;

@@ -30,10 +30,18 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Haile AI Recruitment Command" },
-      { name: "description", content: "Multilingual recruitment, operations, finance and AI intelligence system for Haile AI." },
+      {
+        name: "description",
+        content:
+          "Multilingual recruitment, operations, finance and AI intelligence system for Haile AI.",
+      },
       { name: "author", content: "Haile AI" },
       { property: "og:title", content: "Haile AI Recruitment Command" },
-      { property: "og:description", content: "Dashboards for driver pipeline, revenue, fleet assets and multilingual AI operations." },
+      {
+        property: "og:description",
+        content:
+          "Dashboards for driver pipeline, revenue, fleet assets and multilingual AI operations.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },

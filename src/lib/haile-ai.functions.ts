@@ -59,18 +59,26 @@ export const generateHaileAiText = createServerFn({ method: "POST" })
       });
 
       if (response.status === 429) {
-        return { text: "עומס זמני על שירות ה-AI. נסה שוב בעוד רגע.", source: "rate-limit" as const };
+        return {
+          text: "עומס זמני על שירות ה-AI. נסה שוב בעוד רגע.",
+          source: "rate-limit" as const,
+        };
       }
 
       if (response.status === 402) {
-        return { text: "נדרשת טעינת קרדיטים לשירות ה-AI לפני המשך שימוש.", source: "billing" as const };
+        return {
+          text: "נדרשת טעינת קרדיטים לשירות ה-AI לפני המשך שימוש.",
+          source: "billing" as const,
+        };
       }
 
       if (!response.ok) {
         return { text: fallbackByLanguage[data.language], source: "fallback" as const };
       }
 
-      const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const json = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
       return {
         text: json.choices?.[0]?.message?.content?.trim() || fallbackByLanguage[data.language],
         source: "ai" as const,
