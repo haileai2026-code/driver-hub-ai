@@ -409,7 +409,7 @@ function Index() {
           </div>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        {activeWorkspace === "command" && <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="glass-panel signal-scan rounded-lg p-6 sm:p-8">
             <div className="relative z-[1] max-w-3xl">
               <p className="mb-3 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-black text-accent-foreground">
@@ -446,9 +446,9 @@ function Index() {
               );
             })}
           </div>
-        </section>
+        </section>}
 
-        <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        {activeWorkspace === "candidates" && <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="glass-panel rounded-lg p-5">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -554,9 +554,9 @@ function Index() {
               </div>
             )}
           </aside>
-        </section>
+        </section>}
 
-        <section className="grid gap-6 lg:grid-cols-2">
+        {activeWorkspace === "finance" && <section className="grid gap-6 lg:grid-cols-2">
           <div className="glass-panel rounded-lg p-5">
             <p className="text-sm font-bold text-primary">{t.scat}</p>
             <h2 className="mb-5 text-2xl font-black">{t.revenue}</h2>
@@ -620,9 +620,9 @@ function Index() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
 
-        <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+        {activeWorkspace === "operations" && <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="glass-panel rounded-lg p-5">
             <p className="text-sm font-bold text-primary">{t.profile}</p>
             {selected ? (
@@ -675,7 +675,7 @@ function Index() {
               </Button>
             </div>
           </div>
-        </section>
+        </section>}
       </section>
     </main>
   );
