@@ -175,7 +175,9 @@ function Index() {
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [aiText, setAiText] = useState("בחר מועמד אמיתי מהרשימה כדי להפעיל את שכבת ה-AI הרב-לשונית.");
+  const [aiText, setAiText] = useState(
+    "בחר מועמד אמיתי מהרשימה כדי להפעיל את שכבת ה-AI הרב-לשונית.",
+  );
   const [isLoading, setIsLoading] = useState(false);
   const generateText = useServerFn(generateHaileAiText);
   const t = copy[language];
@@ -191,12 +193,17 @@ function Index() {
         supabase.from("candidates").select("*").order("created_at", { ascending: false }),
         supabase.from("finance_entries").select("*").order("created_at", { ascending: false }),
         supabase.from("company_assets").select("*").order("created_at", { ascending: false }),
-        supabase.from("operation_logs").select("*").order("created_at", { ascending: false }).limit(6),
+        supabase
+          .from("operation_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(6),
       ]);
 
       if (!active) return;
 
-      const firstError = candidateResult.error ?? financeResult.error ?? assetResult.error ?? logResult.error;
+      const firstError =
+        candidateResult.error ?? financeResult.error ?? assetResult.error ?? logResult.error;
       if (firstError) {
         setLoadError(firstError.message);
       }
@@ -217,7 +224,8 @@ function Index() {
     };
   }, []);
 
-  const selected = candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0] ?? null;
+  const selected =
+    candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0] ?? null;
   const missingCount = candidates.filter(
     (candidate) => !candidate.documents.id || !candidate.documents.green,
   ).length;
@@ -341,7 +349,9 @@ function Index() {
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">{metric.label}</p>
-                  <strong className="mt-1 block text-3xl font-black">{isDataLoading ? "…" : metric.value}</strong>
+                  <strong className="mt-1 block text-3xl font-black">
+                    {isDataLoading ? "…" : metric.value}
+                  </strong>
                 </article>
               );
             })}
@@ -409,10 +419,14 @@ function Index() {
                 {logs.map((item) => (
                   <div key={item.id} className="rounded-md border border-border bg-surface p-4">
                     <div className="mb-2 flex items-center gap-2 text-xs font-bold text-muted-foreground">
-                      <Clock3 className="h-4 w-4 text-accent" /> {formatDate(item.created_at)} · {item.operator_name}
+                      <Clock3 className="h-4 w-4 text-accent" /> {formatDate(item.created_at)} ·{" "}
+                      {item.operator_name}
                     </div>
                     <p className="text-sm leading-6">
-                      {item.translated_hebrew || item.notes_hebrew || item.source_message || item.interaction_type}
+                      {item.translated_hebrew ||
+                        item.notes_hebrew ||
+                        item.source_message ||
+                        item.interaction_type}
                     </p>
                   </div>
                 ))}
@@ -549,7 +563,10 @@ function Index() {
 function normalizeCandidate(row: CandidateRow): Candidate {
   const name = normalizeName(row.full_name, row.phone);
   const documents = normalizeDocuments(row.documents);
-  const note = getLocalizedText(row.localized_profile, "he") || getLocalizedText(row.localized_profile, row.preferred_language) || "";
+  const note =
+    getLocalizedText(row.localized_profile, "he") ||
+    getLocalizedText(row.localized_profile, row.preferred_language) ||
+    "";
 
   return {
     id: row.id,
@@ -573,7 +590,10 @@ function normalizeName(value: Json, fallback: string): Record<Language, string> 
 
   const record = value as Partial<Record<Language, Json>>;
   const base = { ...emptyName };
-  const firstText = [record.he, record.am, record.ru].find((item): item is string => typeof item === "string" && item.length > 0) ?? fallback;
+  const firstText =
+    [record.he, record.am, record.ru].find(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    ) ?? fallback;
 
   return {
     he: typeof record.he === "string" && record.he.length > 0 ? record.he : firstText,
