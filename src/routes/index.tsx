@@ -48,6 +48,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Language = "he" | "am" | "ru";
+type Workspace = "command" | "candidates" | "operations" | "finance";
 type Stage = Tables<"candidates">["stage"];
 type CandidateRow = Tables<"candidates">;
 type FinanceRow = Tables<"finance_entries">;
@@ -183,6 +184,7 @@ const stageTone: Record<Stage, string> = {
 
 function Index() {
   const [language, setLanguage] = useState<Language>("he");
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>("candidates");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [finance, setFinance] = useState<FinanceSummary[]>([]);
@@ -194,13 +196,26 @@ function Index() {
     "בחר מועמד אמיתי מהרשימה כדי להפעיל את שכבת ה-AI הרב-לשונית.",
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [importRows, setImportRows] = useState<Record<string, string | number | boolean | null>[]>([]);
+  const [importRows, setImportRows] = useState<Record<string, string | number | boolean | null>[]>(
+    [],
+  );
   const [importFileName, setImportFileName] = useState("");
-  const [importStatus, setImportStatus] = useState("CSV / Excel: full_name, שם בעברית, שם באמהרית, שם ברוסית, phone, city.");
+  const [importStatus, setImportStatus] = useState(
+    "CSV / Excel: full_name, שם בעברית, שם באמהרית, שם ברוסית, phone, city.",
+  );
   const [isImporting, setIsImporting] = useState(false);
   const generateText = useServerFn(generateHaileAiText);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const t = copy[language];
+  const workspaces = useMemo(
+    () => [
+      { key: "command" as const, label: t.nav[0], icon: RadioTower },
+      { key: "candidates" as const, label: "מועמדים", icon: UsersRound },
+      { key: "operations" as const, label: "תפעול", icon: MessageSquareText },
+      { key: "finance" as const, label: "פיננסים", icon: Banknote },
+    ],
+    [t.nav],
+  );
 
   useEffect(() => {
     let active = true;
@@ -245,7 +260,10 @@ function Index() {
   }, []);
 
   const refreshCandidates = async () => {
-    const { data, error } = await supabase.from("candidates").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("*")
+      .order("created_at", { ascending: false });
     if (error) {
       setImportStatus(error.message);
       return;
@@ -334,7 +352,9 @@ function Index() {
       }
 
       const result = await importCandidates({ data: { accessToken, rows: importRows } });
-      setImportStatus(`${t.importDone}: ${result.inserted} נשמרו, ${result.skipped} דולגו${result.errors.length ? ` · ${result.errors.slice(0, 3).join(" · ")}` : ""}`);
+      setImportStatus(
+        `${t.importDone}: ${result.inserted} נשמרו, ${result.skipped} דולגו${result.errors.length ? ` · ${result.errors.slice(0, 3).join(" · ")}` : ""}`,
+      );
       setImportRows([]);
       setImportFileName("");
       await refreshCandidates();
@@ -363,12 +383,21 @@ function Index() {
               </h1>
             </div>
           </div>
-          <nav className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            {t.nav.map((item) => (
-              <span key={item} className="rounded-md border border-border bg-surface px-3 py-2">
-                {item}
-              </span>
-            ))}
+          <nav className="grid grid-cols-2 gap-2 text-sm text-muted-foreground sm:flex sm:flex-wrap sm:items-center">
+            {workspaces.map((workspace) => {
+              const Icon = workspace.icon;
+              return (
+                <button
+                  key={workspace.key}
+                  type="button"
+                  onClick={() => setActiveWorkspace(workspace.key)}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 py-2 font-bold transition ${activeWorkspace === workspace.key ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "border-border bg-surface text-muted-foreground hover:bg-surface-strong hover:text-foreground"}`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {workspace.label}
+                </button>
+              );
+            })}
           </nav>
           <div className="flex rounded-md border border-border bg-surface p-1">
             {(["he", "am", "ru"] as Language[]).map((item) => (
@@ -389,273 +418,283 @@ function Index() {
           </div>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="glass-panel signal-scan rounded-lg p-6 sm:p-8">
-            <div className="relative z-[1] max-w-3xl">
-              <p className="mb-3 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-black text-accent-foreground">
-                <RadioTower className="h-4 w-4" /> {t.exec}
-              </p>
-              <h2 className="font-display text-4xl font-black leading-tight tracking-normal sm:text-6xl">
-                {t.subtitle}
-              </h2>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                הנתונים במסך נטענים ישירות ממסד הנתונים של Haile AI בלבד.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {metrics.map((metric) => {
-              const Icon = metric.icon;
-              return (
-                <article
-                  key={metric.label}
-                  className="glass-panel rounded-lg p-5 transition duration-300 hover:-translate-y-1"
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <span className="rounded-sm bg-success/20 px-2 py-1 text-xs font-black text-success">
-                      {metric.delta}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{metric.label}</p>
-                  <strong className="mt-1 block text-3xl font-black">
-                    {isDataLoading ? "…" : metric.value}
-                  </strong>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <div className="glass-panel rounded-lg p-5">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-bold text-primary">{t.ciel}</p>
-                <h2 className="text-2xl font-black">{t.pipeline}</h2>
+        {activeWorkspace === "command" && (
+          <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="glass-panel signal-scan rounded-lg p-6 sm:p-8">
+              <div className="relative z-[1] max-w-3xl">
+                <p className="mb-3 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-black text-accent-foreground">
+                  <RadioTower className="h-4 w-4" /> {t.exec}
+                </p>
+                <h2 className="font-display text-4xl font-black leading-tight tracking-normal sm:text-6xl">
+                  {t.subtitle}
+                </h2>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+                  הנתונים במסך נטענים ישירות ממסד הנתונים של Haile AI בלבד.
+                </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="tactical" asChild>
-                  <label className="cursor-pointer">
-                    <UploadCloud className="h-4 w-4" /> {t.importAction}
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      className="sr-only"
-                      onChange={handleImportFile}
-                    />
-                  </label>
-                </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {metrics.map((metric) => {
+                const Icon = metric.icon;
+                return (
+                  <article
+                    key={metric.label}
+                    className="glass-panel rounded-lg p-5 transition duration-300 hover:-translate-y-1"
+                  >
+                    <div className="mb-6 flex items-center justify-between">
+                      <Icon className="h-5 w-5 text-primary" />
+                      <span className="rounded-sm bg-success/20 px-2 py-1 text-xs font-black text-success">
+                        {metric.delta}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{metric.label}</p>
+                    <strong className="mt-1 block text-3xl font-black">
+                      {isDataLoading ? "…" : metric.value}
+                    </strong>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {activeWorkspace === "candidates" && (
+          <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+            <div className="glass-panel rounded-lg p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-primary">{t.ciel}</p>
+                  <h2 className="text-2xl font-black">{t.pipeline}</h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="tactical" asChild>
+                    <label className="cursor-pointer">
+                      <UploadCloud className="h-4 w-4" /> {t.importAction}
+                      <input
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        className="sr-only"
+                        onChange={handleImportFile}
+                      />
+                    </label>
+                  </Button>
+                  <Button
+                    variant="command"
+                    onClick={() => runAi("status_template")}
+                    disabled={isLoading || !selected}
+                  >
+                    <Send className="h-4 w-4" /> {t.reminder}
+                  </Button>
+                </div>
+              </div>
+              <div className="mb-4 rounded-md border border-border bg-surface p-4 text-sm leading-6 text-muted-foreground">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <strong className="text-foreground">{t.importTitle}</strong>
+                    <p>{importFileName || importStatus}</p>
+                  </div>
+                  <Button
+                    variant="intel"
+                    size="sm"
+                    onClick={runCandidateImport}
+                    disabled={isImporting || importRows.length === 0}
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    {isImporting ? "מייבא..." : `${t.importAction} (${importRows.length})`}
+                  </Button>
+                </div>
+                {importFileName && <p className="mt-2 text-primary">{importStatus}</p>}
+              </div>
+              {candidates.length === 0 ? (
+                <EmptyState text={isDataLoading ? "טוען נתונים אמיתיים..." : t.emptyCandidates} />
+              ) : (
+                <div className="grid gap-3">
+                  {candidates.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => setSelectedId(candidate.id)}
+                      className={`grid gap-4 rounded-lg border p-4 text-start transition duration-300 hover:-translate-y-0.5 sm:grid-cols-[1fr_auto_auto] sm:items-center ${selected?.id === candidate.id ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
+                    >
+                      <div>
+                        <h3 className="text-lg font-black">{candidate.name[language]}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {candidate.city} · {candidate.phone} · {candidate.licenseStatus}
+                        </p>
+                      </div>
+                      <span
+                        className={`w-fit rounded-sm px-3 py-1 text-xs font-black ${stageTone[candidate.stage]}`}
+                      >
+                        {candidate.stage}
+                      </span>
+                      <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                        {candidate.documents.id && candidate.documents.green ? (
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                        ) : (
+                          <FileWarning className="h-4 w-4 text-warning" />
+                        )}
+                        ID {candidate.documents.id ? "✓" : "—"} · Green{" "}
+                        {candidate.documents.green ? "✓" : "—"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <aside className="glass-panel rounded-lg p-5">
+              <p className="text-sm font-bold text-primary">{t.feed}</p>
+              <h2 className="mb-4 text-2xl font-black">Live command notes</h2>
+              {logs.length === 0 ? (
+                <EmptyState text={isDataLoading ? "טוען יומן פעילות..." : t.emptyLogs} />
+              ) : (
+                <div className="space-y-3">
+                  {logs.map((item) => (
+                    <div key={item.id} className="rounded-md border border-border bg-surface p-4">
+                      <div className="mb-2 flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                        <Clock3 className="h-4 w-4 text-accent" /> {formatDate(item.created_at)} ·{" "}
+                        {item.operator_name}
+                      </div>
+                      <p className="text-sm leading-6">
+                        {item.translated_hebrew ||
+                          item.notes_hebrew ||
+                          item.source_message ||
+                          item.interaction_type}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </aside>
+          </section>
+        )}
+
+        {activeWorkspace === "finance" && (
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="glass-panel rounded-lg p-5">
+              <p className="text-sm font-bold text-primary">{t.scat}</p>
+              <h2 className="mb-5 text-2xl font-black">{t.revenue}</h2>
+              {finance.length === 0 ? (
+                <EmptyState text={isDataLoading ? "טוען כספים..." : t.emptyFinance} />
+              ) : (
+                <div className="space-y-4">
+                  {finance.map((row) => (
+                    <div key={row.key} className="rounded-md border border-border bg-surface p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <strong>
+                          {row.city} · {row.company}
+                        </strong>
+                        <span className="text-xl font-black">{formatCurrency(row.pending)}</span>
+                      </div>
+                      <div className="h-3 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-warning"
+                          style={{ width: `${getPendingRatio(row)}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Pending vs received ledger balance
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="glass-panel rounded-lg p-5">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-primary">Company Assets</p>
+                  <h2 className="text-2xl font-black">{t.assets}</h2>
+                </div>
+                <Car className="h-8 w-8 text-accent" />
+              </div>
+              {assets.length === 0 ? (
+                <EmptyState text={isDataLoading ? "טוען רכבים..." : t.emptyAssets} />
+              ) : (
+                <div className="grid gap-3">
+                  {assets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-border bg-surface p-4"
+                    >
+                      <div>
+                        <strong>{asset.vehicle_name}</strong>
+                        <p className="text-sm text-muted-foreground">
+                          {asset.plate_number} · {asset.mileage.toLocaleString()} km
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-sm px-2 py-1 text-xs font-black ${asset.status === "service_due" ? "bg-warning/20 text-warning" : "bg-success/20 text-success"}`}
+                      >
+                        {asset.next_service_date
+                          ? formatDate(asset.next_service_date)
+                          : asset.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeWorkspace === "operations" && (
+          <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+            <div className="glass-panel rounded-lg p-5">
+              <p className="text-sm font-bold text-primary">{t.profile}</p>
+              {selected ? (
+                <>
+                  <h2 className="mt-1 text-3xl font-black">{selected.name[language]}</h2>
+                  <div className="mt-5 grid gap-3 text-sm">
+                    <Info icon={UsersRound} label="City" value={selected.city} />
+                    <Info icon={Building2} label="Stage" value={selected.stage} />
+                    <Info icon={Languages} label="Native" value={selected.language.toUpperCase()} />
+                    <Info icon={LineChart} label="Next" value={selected.nextStep} />
+                  </div>
+                </>
+              ) : (
+                <EmptyState text={t.emptyCandidates} />
+              )}
+            </div>
+
+            <div className="glass-panel rounded-lg p-5">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-primary">AI Translation Layer</p>
+                  <h2 className="text-2xl font-black">{t.translate}</h2>
+                </div>
+                <Bot className="h-8 w-8 text-primary" />
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-5 text-base leading-8 text-foreground">
+                {isLoading ? "AI מנתח את המידע..." : aiText}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
                 <Button
                   variant="command"
+                  onClick={() => runAi("candidate_next_step")}
+                  disabled={isLoading || !selected}
+                >
+                  <Bot className="h-4 w-4" /> {t.askAi}
+                </Button>
+                <Button
+                  variant="intel"
+                  onClick={() => runAi("translate_to_hebrew")}
+                  disabled={isLoading || !selected}
+                >
+                  <Languages className="h-4 w-4" /> {t.translate}
+                </Button>
+                <Button
+                  variant="tactical"
                   onClick={() => runAi("status_template")}
                   disabled={isLoading || !selected}
                 >
-                  <Send className="h-4 w-4" /> {t.reminder}
+                  <MessageSquareText className="h-4 w-4" /> {t.template}
                 </Button>
               </div>
             </div>
-            <div className="mb-4 rounded-md border border-border bg-surface p-4 text-sm leading-6 text-muted-foreground">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <strong className="text-foreground">{t.importTitle}</strong>
-                  <p>{importFileName || importStatus}</p>
-                </div>
-                <Button
-                  variant="intel"
-                  size="sm"
-                  onClick={runCandidateImport}
-                  disabled={isImporting || importRows.length === 0}
-                >
-                  <UploadCloud className="h-4 w-4" />
-                  {isImporting ? "מייבא..." : `${t.importAction} (${importRows.length})`}
-                </Button>
-              </div>
-              {importFileName && <p className="mt-2 text-primary">{importStatus}</p>}
-            </div>
-            {candidates.length === 0 ? (
-              <EmptyState text={isDataLoading ? "טוען נתונים אמיתיים..." : t.emptyCandidates} />
-            ) : (
-              <div className="grid gap-3">
-                {candidates.map((candidate) => (
-                  <button
-                    key={candidate.id}
-                    onClick={() => setSelectedId(candidate.id)}
-                    className={`grid gap-4 rounded-lg border p-4 text-start transition duration-300 hover:-translate-y-0.5 sm:grid-cols-[1fr_auto_auto] sm:items-center ${selected?.id === candidate.id ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
-                  >
-                    <div>
-                      <h3 className="text-lg font-black">{candidate.name[language]}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {candidate.city} · {candidate.phone} · {candidate.licenseStatus}
-                      </p>
-                    </div>
-                    <span
-                      className={`w-fit rounded-sm px-3 py-1 text-xs font-black ${stageTone[candidate.stage]}`}
-                    >
-                      {candidate.stage}
-                    </span>
-                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                      {candidate.documents.id && candidate.documents.green ? (
-                        <CheckCircle2 className="h-4 w-4 text-success" />
-                      ) : (
-                        <FileWarning className="h-4 w-4 text-warning" />
-                      )}
-                      ID {candidate.documents.id ? "✓" : "—"} · Green{" "}
-                      {candidate.documents.green ? "✓" : "—"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <aside className="glass-panel rounded-lg p-5">
-            <p className="text-sm font-bold text-primary">{t.feed}</p>
-            <h2 className="mb-4 text-2xl font-black">Live command notes</h2>
-            {logs.length === 0 ? (
-              <EmptyState text={isDataLoading ? "טוען יומן פעילות..." : t.emptyLogs} />
-            ) : (
-              <div className="space-y-3">
-                {logs.map((item) => (
-                  <div key={item.id} className="rounded-md border border-border bg-surface p-4">
-                    <div className="mb-2 flex items-center gap-2 text-xs font-bold text-muted-foreground">
-                      <Clock3 className="h-4 w-4 text-accent" /> {formatDate(item.created_at)} ·{" "}
-                      {item.operator_name}
-                    </div>
-                    <p className="text-sm leading-6">
-                      {item.translated_hebrew ||
-                        item.notes_hebrew ||
-                        item.source_message ||
-                        item.interaction_type}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </aside>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="glass-panel rounded-lg p-5">
-            <p className="text-sm font-bold text-primary">{t.scat}</p>
-            <h2 className="mb-5 text-2xl font-black">{t.revenue}</h2>
-            {finance.length === 0 ? (
-              <EmptyState text={isDataLoading ? "טוען כספים..." : t.emptyFinance} />
-            ) : (
-              <div className="space-y-4">
-                {finance.map((row) => (
-                  <div key={row.key} className="rounded-md border border-border bg-surface p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <strong>
-                        {row.city} · {row.company}
-                      </strong>
-                      <span className="text-xl font-black">{formatCurrency(row.pending)}</span>
-                    </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-warning"
-                        style={{ width: `${getPendingRatio(row)}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Pending vs received ledger balance
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="glass-panel rounded-lg p-5">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-primary">Company Assets</p>
-                <h2 className="text-2xl font-black">{t.assets}</h2>
-              </div>
-              <Car className="h-8 w-8 text-accent" />
-            </div>
-            {assets.length === 0 ? (
-              <EmptyState text={isDataLoading ? "טוען רכבים..." : t.emptyAssets} />
-            ) : (
-              <div className="grid gap-3">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-border bg-surface p-4"
-                  >
-                    <div>
-                      <strong>{asset.vehicle_name}</strong>
-                      <p className="text-sm text-muted-foreground">
-                        {asset.plate_number} · {asset.mileage.toLocaleString()} km
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-sm px-2 py-1 text-xs font-black ${asset.status === "service_due" ? "bg-warning/20 text-warning" : "bg-success/20 text-success"}`}
-                    >
-                      {asset.next_service_date ? formatDate(asset.next_service_date) : asset.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="glass-panel rounded-lg p-5">
-            <p className="text-sm font-bold text-primary">{t.profile}</p>
-            {selected ? (
-              <>
-                <h2 className="mt-1 text-3xl font-black">{selected.name[language]}</h2>
-                <div className="mt-5 grid gap-3 text-sm">
-                  <Info icon={UsersRound} label="City" value={selected.city} />
-                  <Info icon={Building2} label="Stage" value={selected.stage} />
-                  <Info icon={Languages} label="Native" value={selected.language.toUpperCase()} />
-                  <Info icon={LineChart} label="Next" value={selected.nextStep} />
-                </div>
-              </>
-            ) : (
-              <EmptyState text={t.emptyCandidates} />
-            )}
-          </div>
-
-          <div className="glass-panel rounded-lg p-5">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-bold text-primary">AI Translation Layer</p>
-                <h2 className="text-2xl font-black">{t.translate}</h2>
-              </div>
-              <Bot className="h-8 w-8 text-primary" />
-            </div>
-            <div className="rounded-lg border border-border bg-background/60 p-5 text-base leading-8 text-foreground">
-              {isLoading ? "AI מנתח את המידע..." : aiText}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button
-                variant="command"
-                onClick={() => runAi("candidate_next_step")}
-                disabled={isLoading || !selected}
-              >
-                <Bot className="h-4 w-4" /> {t.askAi}
-              </Button>
-              <Button
-                variant="intel"
-                onClick={() => runAi("translate_to_hebrew")}
-                disabled={isLoading || !selected}
-              >
-                <Languages className="h-4 w-4" /> {t.translate}
-              </Button>
-              <Button
-                variant="tactical"
-                onClick={() => runAi("status_template")}
-                disabled={isLoading || !selected}
-              >
-                <MessageSquareText className="h-4 w-4" /> {t.template}
-              </Button>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
       </section>
     </main>
   );
@@ -684,7 +723,9 @@ function normalizeCandidate(row: CandidateRow): Candidate {
   };
 }
 
-async function parseImportFile(file: File): Promise<Record<string, string | number | boolean | null>[]> {
+async function parseImportFile(
+  file: File,
+): Promise<Record<string, string | number | boolean | null>[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array", raw: false });
   const sheetName = workbook.SheetNames[0];
@@ -702,7 +743,10 @@ async function parseImportFile(file: File): Promise<Record<string, string | numb
   const cleanRows = rows
     .map((row) =>
       Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [key.trim(), typeof value === "string" ? value.trim() : value]),
+        Object.entries(row).map(([key, value]) => [
+          key.trim(),
+          typeof value === "string" ? value.trim() : value,
+        ]),
       ),
     )
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
