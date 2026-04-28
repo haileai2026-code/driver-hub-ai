@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Heebo:wght@400;600;700;800;900&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -73,23 +74,23 @@
 }
 
 :root {
-  --font-display-token: "Arial", "Noto Sans Hebrew", sans-serif;
-  --font-sans-token: "Arial", "Noto Sans Hebrew", sans-serif;
+  --font-display-token: "Heebo", "Assistant", sans-serif;
+  --font-sans-token: "Assistant", "Heebo", sans-serif;
   --radius: 0.5rem;
-  --background: oklch(0.156 0.024 224.7);
-  --foreground: oklch(0.955 0.015 101.6);
-  --card: oklch(0.207 0.028 224.9 / 82%);
-  --card-foreground: oklch(0.955 0.015 101.6);
-  --popover: oklch(0.19 0.027 224.9);
-  --popover-foreground: oklch(0.955 0.015 101.6);
-  --primary: oklch(0.72 0.144 151.9);
-  --primary-foreground: oklch(0.133 0.022 224.6);
-  --secondary: oklch(0.253 0.031 223.8);
-  --secondary-foreground: oklch(0.93 0.018 101.6);
-  --muted: oklch(0.259 0.025 224.8);
-  --muted-foreground: oklch(0.724 0.025 211.6);
-  --accent: oklch(0.752 0.14 78.3);
-  --accent-foreground: oklch(0.145 0.025 224.6);
+  --background: oklch(0.115 0.028 263.6);
+  --foreground: oklch(0.91 0.026 248.1);
+  --card: oklch(0.18 0.034 260.2 / 88%);
+  --card-foreground: oklch(0.91 0.026 248.1);
+  --popover: oklch(0.18 0.034 260.2);
+  --popover-foreground: oklch(0.91 0.026 248.1);
+  --primary: oklch(0.546 0.215 262.88);
+  --primary-foreground: oklch(0.985 0.006 247.8);
+  --secondary: oklch(0.235 0.037 260.2);
+  --secondary-foreground: oklch(0.91 0.026 248.1);
+  --muted: oklch(0.25 0.035 258.9);
+  --muted-foreground: oklch(0.704 0.04 256.8);
+  --accent: oklch(0.768 0.164 70.1);
+  --accent-foreground: oklch(0.115 0.028 263.6);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.973 0.012 73.7);
   --border: oklch(0.365 0.03 222.5 / 62%);
@@ -108,15 +109,15 @@
   --sidebar-accent-foreground: oklch(0.955 0.015 101.6);
   --sidebar-border: oklch(0.365 0.03 222.5 / 62%);
   --sidebar-ring: oklch(0.72 0.144 151.9);
-  --success: oklch(0.7 0.15 151.3);
-  --success-foreground: oklch(0.133 0.022 224.6);
-  --warning: oklch(0.78 0.143 78.1);
-  --warning-foreground: oklch(0.145 0.025 224.6);
-  --intel: oklch(0.664 0.148 247.1);
+  --success: oklch(0.696 0.149 162.5);
+  --success-foreground: oklch(0.115 0.028 263.6);
+  --warning: oklch(0.768 0.164 70.1);
+  --warning-foreground: oklch(0.115 0.028 263.6);
+  --intel: oklch(0.606 0.218 292.7);
   --intel-foreground: oklch(0.965 0.014 101.6);
-  --surface: oklch(0.226 0.028 224.9 / 70%);
-  --surface-strong: oklch(0.276 0.032 224.9 / 88%);
-  --rail: oklch(0.766 0.093 178.2);
+  --surface: oklch(0.18 0.034 260.2 / 76%);
+  --surface-strong: oklch(0.235 0.037 260.2 / 92%);
+  --rail: oklch(0.546 0.215 262.88);
 }
 
 .dark {
