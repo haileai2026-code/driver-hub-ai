@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -12,14 +12,12 @@ import {
   ChevronLeft,
   FileText,
   Gauge,
-  Headphones,
   Home,
   KeyRound,
   Languages,
   Mail,
   Menu,
   Mic,
-  PanelRightClose,
   Phone,
   Search,
   Settings,
@@ -752,8 +750,8 @@ function Panel({
   children,
 }: {
   title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="glass-panel rounded-lg p-4 sm:p-5">
@@ -903,12 +901,21 @@ function AgentCard({
   description: string;
   tone: string;
 }) {
+  const iconTone =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "intel"
+          ? "text-intel"
+          : "text-primary";
+
   return (
     <article className="glass-panel rounded-lg p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-md bg-surface-strong">
-            <Icon className={`h-5 w-5 text-${tone}`} />
+            <Icon className={`h-5 w-5 ${iconTone}`} />
           </div>
           <div>
             <h3 className="text-xl font-black">{name}</h3>
