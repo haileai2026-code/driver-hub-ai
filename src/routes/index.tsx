@@ -467,6 +467,97 @@ function HaileApp() {
   );
 }
 
+function AuthScreen({
+  mode,
+  status,
+  onMode,
+  onLogin,
+  onFirstAdmin,
+}: {
+  mode: AuthMode;
+  status: string;
+  onMode: (mode: AuthMode) => void;
+  onLogin: (email: string, password: string) => void;
+  onFirstAdmin: (email: string, password: string, fullName: string) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("בני אספה");
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (mode === "firstAdmin") onFirstAdmin(email, password, fullName);
+    else onLogin(email, password);
+  };
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground" dir="rtl">
+      <form onSubmit={submit} className="glass-panel w-full max-w-md rounded-lg p-6">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black">היילה AI</h1>
+            <p className="text-sm text-muted-foreground">כניסה מאובטחת למערכת ניהול אמיתית</p>
+          </div>
+        </div>
+        {mode === "firstAdmin" && (
+          <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
+        )}
+        <Field label="אימייל" value={email} onChange={setEmail} type="email" />
+        <Field label="סיסמה" value={password} onChange={setPassword} type="password" />
+        <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
+          <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
+        </Button>
+        <button
+          type="button"
+          onClick={() => onMode(mode === "login" ? "firstAdmin" : "login")}
+          className="mt-4 w-full text-center text-sm font-bold text-primary"
+        >
+          {mode === "login" ? "אין משתמש? הגדרת מנהל ראשי ראשון" : "חזרה לכניסה"}
+        </button>
+        <p className="mt-4 rounded-md border border-border bg-surface p-3 text-sm text-muted-foreground">
+          {status}
+        </p>
+      </form>
+    </main>
+  );
+}
+
+function LoadingScreen({ text }: { text: string }) {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background text-foreground" dir="rtl">
+      <div className="glass-panel rounded-lg p-6 text-sm text-muted-foreground">{text}</div>
+    </main>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="mb-3 block text-sm font-bold">
+      {label}
+      <input
+        required
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-primary"
+      />
+    </label>
+  );
+}
+
 function DashboardPage({
   activeCandidates,
   placedCandidates,
