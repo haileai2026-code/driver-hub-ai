@@ -29,11 +29,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Haile AI Recruitment Command" },
+      { name: "description", content: "Multilingual recruitment, operations, finance and AI intelligence system for Haile AI." },
+      { name: "author", content: "Haile AI" },
+      { property: "og:title", content: "Haile AI Recruitment Command" },
+      { property: "og:description", content: "Dashboards for driver pipeline, revenue, fleet assets and multilingual AI operations." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -52,7 +52,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="he" dir="rtl">
       <head>
         <HeadContent />
       </head>
