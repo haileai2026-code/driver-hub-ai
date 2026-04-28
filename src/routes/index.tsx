@@ -1324,6 +1324,20 @@ function gradeFromScore(score: number | null): Candidate["grade"] {
   return "C";
 }
 
+function pickRole(roles: string[]): AppRole | null {
+  if (roles.includes("super_admin")) return "super_admin";
+  if (roles.includes("operator")) return "operator";
+  if (roles.includes("viewer")) return "viewer";
+  return null;
+}
+
+function roleLabel(role: AppRole | null) {
+  if (role === "super_admin") return "SUPER_ADMIN";
+  if (role === "operator") return "OPERATOR";
+  if (role === "viewer") return "VIEWER";
+  return "ללא תפקיד";
+}
+
 function average(values: number[]) {
   if (!values.length) return null;
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
