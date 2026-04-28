@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -10,16 +10,19 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronLeft,
+  Download,
   FileText,
   Gauge,
   Home,
   KeyRound,
   Languages,
+  LogOut,
   Mail,
   Menu,
   Mic,
   Phone,
   Search,
+  Save,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -33,6 +36,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
 
