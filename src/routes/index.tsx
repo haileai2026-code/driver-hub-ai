@@ -84,6 +84,21 @@ type Candidate = {
   documentsReady: boolean;
   note: string;
 };
+type AppRole = "super_admin" | "operator" | "viewer";
+type AuthUser = { id: string; email: string; role: AppRole | null };
+type CandidateForm = {
+  name: string;
+  phone: string;
+  age: string;
+  city: "Ashkelon" | "Kiryat Gat";
+  language: "he" | "am" | "ru";
+  stage: "Lead" | "Learning" | "Test" | "Placed";
+  licenseStatus: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
+  note: string;
+  idDocument: boolean;
+  greenForm: boolean;
+};
+type AuthMode = "login" | "firstAdmin";
 
 const navItems: Array<{
   key: PageKey;
@@ -112,6 +127,10 @@ const stageLabels: Record<string, string> = {
 
 function HaileApp() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authStatus, setAuthStatus] = useState("יש להתחבר כדי להפעיל את המערכת.");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -131,10 +150,34 @@ function HaileApp() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
+  const createAdmin = useServerFn(createFirstSuperAdmin);
+  const inviteUser = useServerFn(inviteSystemUser);
 
   useEffect(() => {
-    void loadLiveData();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      setTimeout(() => void refreshAuth(), 0);
+    });
+    void refreshAuth();
+    return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (authUser) void loadLiveData();
+  }, [authUser?.id]);
+
+  const refreshAuth = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      setAuthUser(null);
+      setAuthChecked(true);
+      return;
+    }
+
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
+    const role = pickRole((roles ?? []).map((item) => item.role));
+    setAuthUser({ id: data.user.id, email: data.user.email ?? "", role });
+    setAuthChecked(true);
+  };
 
   const loadLiveData = async () => {
     setIsLoadingData(true);
