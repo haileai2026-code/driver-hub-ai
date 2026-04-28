@@ -148,6 +148,8 @@ function HaileApp() {
   const [isImporting, setIsImporting] = useState(false);
   const [aiText, setAiText] = useState("בחר מועמד כדי להפעיל תרגום או ניסוח הודעה.");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
+  const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
   const createAdmin = useServerFn(createFirstSuperAdmin);
@@ -291,6 +293,70 @@ function HaileApp() {
     } finally {
       setIsAiLoading(false);
     }
+  };
+
+  const saveCandidate = async () => {
+    if (!candidateForm.name.trim() || !candidateForm.phone.trim()) {
+      setActionStatus("שם וטלפון הם שדות חובה.");
+      return;
+    }
+
+    const { error } = await supabase.from("candidates").insert({
+      full_name: { he: candidateForm.name, am: candidateForm.name, ru: candidateForm.name },
+      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+      age: candidateForm.age ? Number(candidateForm.age) : null,
+      city: candidateForm.city,
+      preferred_language: candidateForm.language,
+      stage: candidateForm.stage,
+      license_status: candidateForm.licenseStatus,
+      documents: {
+        id: { received: candidateForm.idDocument, url: null },
+        green_form: { received: candidateForm.greenForm, url: null },
+      },
+      localized_profile: { he: { note: candidateForm.note }, am: {}, ru: {} },
+    });
+
+    if (error) {
+      setActionStatus(`שמירת מועמד נכשלה: ${error.message}`);
+      return;
+    }
+
+    setCandidateForm(emptyCandidateForm());
+    setActionStatus("המועמד נשמר בהצלחה.");
+    await loadLiveData();
+  };
+
+  const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
+    if (!selected) return;
+    const { error } = await supabase.from("candidates").update({ stage }).eq("id", selected.id);
+    setActionStatus(error ? `עדכון סטטוס נכשל: ${error.message}` : "סטטוס המועמד עודכן.");
+    if (!error) await loadLiveData();
+  };
+
+  const exportCandidates = () => {
+    const rows = candidates.map((candidate) => ({
+      שם: candidate.name,
+      טלפון: formatPhone(candidate.phone),
+      עיר: candidate.city,
+      שפה: candidate.language,
+      סטטוס: stageLabels[candidate.stage] ?? candidate.stage,
+      רישיון: candidate.licenseStatus,
+      מסמכים: candidate.documentsReady ? "תקין" : "חסר",
+      תאריך: formatDate(candidate.createdAt),
+    }));
+    downloadCsv("haile-candidates.csv", rows);
+    setActionStatus("קובץ המועמדים ירד למחשב.");
+  };
+
+  const handleInvite = async (email: string, password: string, role: "operator" | "viewer") => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר כמנהל ראשי.");
+      return;
+    }
+    const result = await inviteUser({ data: { accessToken, email, password, role } });
+    setActionStatus(result.message);
   };
 
   const handleLogin = async (email: string, password: string) => {
