@@ -731,6 +731,11 @@ function CandidatesPage({
   onFile,
   onImport,
   onAi,
+  form,
+  onFormChange,
+  onSaveCandidate,
+  onStageChange,
+  actionStatus,
   aiText,
   isAiLoading,
 }: {
@@ -747,6 +752,11 @@ function CandidatesPage({
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  form: CandidateForm;
+  onFormChange: (form: CandidateForm) => void;
+  onSaveCandidate: () => void;
+  onStageChange: (stage: CandidateForm["stage"]) => void;
+  actionStatus: string;
   aiText: string;
   isAiLoading: boolean;
 }) {
@@ -801,12 +811,15 @@ function CandidatesPage({
       </Panel>
 
       <Panel title="פרופיל מועמד + CIEL">
+        <Notice tone="success" text={actionStatus} />
+        <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} />
         {!selected ? (
           <EmptyState text="בחר מועמד כדי לפתוח פרופיל." />
         ) : (
           <CandidateProfile
             candidate={selected}
             onAi={onAi}
+            onStageChange={onStageChange}
             aiText={aiText}
             isAiLoading={isAiLoading}
           />
