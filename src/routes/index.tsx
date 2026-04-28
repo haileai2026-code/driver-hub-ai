@@ -435,13 +435,44 @@ function Index() {
                 <p className="text-sm font-bold text-primary">{t.ciel}</p>
                 <h2 className="text-2xl font-black">{t.pipeline}</h2>
               </div>
-              <Button
-                variant="command"
-                onClick={() => runAi("status_template")}
-                disabled={isLoading || !selected}
-              >
-                <Send className="h-4 w-4" /> {t.reminder}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="tactical" asChild>
+                  <label className="cursor-pointer">
+                    <UploadCloud className="h-4 w-4" /> {t.importAction}
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="sr-only"
+                      onChange={handleImportFile}
+                    />
+                  </label>
+                </Button>
+                <Button
+                  variant="command"
+                  onClick={() => runAi("status_template")}
+                  disabled={isLoading || !selected}
+                >
+                  <Send className="h-4 w-4" /> {t.reminder}
+                </Button>
+              </div>
+            </div>
+            <div className="mb-4 rounded-md border border-border bg-surface p-4 text-sm leading-6 text-muted-foreground">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <strong className="text-foreground">{t.importTitle}</strong>
+                  <p>{importFileName || importStatus}</p>
+                </div>
+                <Button
+                  variant="intel"
+                  size="sm"
+                  onClick={runCandidateImport}
+                  disabled={isImporting || importRows.length === 0}
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  {isImporting ? "מייבא..." : `${t.importAction} (${importRows.length})`}
+                </Button>
+              </div>
+              {importFileName && <p className="mt-2 text-primary">{importStatus}</p>}
             </div>
             {candidates.length === 0 ? (
               <EmptyState text={isDataLoading ? "טוען נתונים אמיתיים..." : t.emptyCandidates} />
