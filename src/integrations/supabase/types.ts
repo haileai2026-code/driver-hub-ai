@@ -14,16 +14,348 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_recommendations: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          created_by_role: Database["public"]["Enums"]["app_role"]
+          id: string
+          language: Database["public"]["Enums"]["preferred_language"]
+          recommendation: string
+          recommended_action: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          created_by_role?: Database["public"]["Enums"]["app_role"]
+          id?: string
+          language?: Database["public"]["Enums"]["preferred_language"]
+          recommendation: string
+          recommended_action?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          created_by_role?: Database["public"]["Enums"]["app_role"]
+          id?: string
+          language?: Database["public"]["Enums"]["preferred_language"]
+          recommendation?: string
+          recommended_action?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_recommendations_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidates: {
+        Row: {
+          age: number | null
+          assigned_to: string | null
+          city: Database["public"]["Enums"]["candidate_city"]
+          created_at: string
+          documents: Json
+          full_name: Json
+          id: string
+          last_contacted_at: string | null
+          license_status: Database["public"]["Enums"]["license_status"]
+          localized_profile: Json
+          next_step_due_at: string | null
+          phone: string
+          preferred_language: Database["public"]["Enums"]["preferred_language"]
+          stage: Database["public"]["Enums"]["candidate_stage"]
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          assigned_to?: string | null
+          city: Database["public"]["Enums"]["candidate_city"]
+          created_at?: string
+          documents?: Json
+          full_name?: Json
+          id?: string
+          last_contacted_at?: string | null
+          license_status?: Database["public"]["Enums"]["license_status"]
+          localized_profile?: Json
+          next_step_due_at?: string | null
+          phone: string
+          preferred_language?: Database["public"]["Enums"]["preferred_language"]
+          stage?: Database["public"]["Enums"]["candidate_stage"]
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          assigned_to?: string | null
+          city?: Database["public"]["Enums"]["candidate_city"]
+          created_at?: string
+          documents?: Json
+          full_name?: Json
+          id?: string
+          last_contacted_at?: string | null
+          license_status?: Database["public"]["Enums"]["license_status"]
+          localized_profile?: Json
+          next_step_due_at?: string | null
+          phone?: string
+          preferred_language?: Database["public"]["Enums"]["preferred_language"]
+          stage?: Database["public"]["Enums"]["candidate_stage"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_assets: {
+        Row: {
+          created_at: string
+          fleet_group: string
+          id: string
+          last_service_date: string | null
+          mileage: number
+          next_service_date: string | null
+          notes: string | null
+          plate_number: string
+          status: Database["public"]["Enums"]["asset_status"]
+          updated_at: string
+          vehicle_name: string
+        }
+        Insert: {
+          created_at?: string
+          fleet_group?: string
+          id?: string
+          last_service_date?: string | null
+          mileage?: number
+          next_service_date?: string | null
+          notes?: string | null
+          plate_number: string
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+          vehicle_name: string
+        }
+        Update: {
+          created_at?: string
+          fleet_group?: string
+          id?: string
+          last_service_date?: string | null
+          mileage?: number
+          next_service_date?: string | null
+          notes?: string | null
+          plate_number?: string
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+          vehicle_name?: string
+        }
+        Relationships: []
+      }
+      finance_entries: {
+        Row: {
+          amount: number
+          candidate_id: string | null
+          city: Database["public"]["Enums"]["candidate_city"] | null
+          company: Database["public"]["Enums"]["bus_company"] | null
+          created_at: string
+          currency: string
+          due_date: string | null
+          entry_type: Database["public"]["Enums"]["finance_entry_type"]
+          id: string
+          notes: string | null
+          paid_at: string | null
+          status: Database["public"]["Enums"]["finance_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          candidate_id?: string | null
+          city?: Database["public"]["Enums"]["candidate_city"] | null
+          company?: Database["public"]["Enums"]["bus_company"] | null
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          entry_type: Database["public"]["Enums"]["finance_entry_type"]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["finance_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          candidate_id?: string | null
+          city?: Database["public"]["Enums"]["candidate_city"] | null
+          company?: Database["public"]["Enums"]["bus_company"] | null
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          entry_type?: Database["public"]["Enums"]["finance_entry_type"]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["finance_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_entries_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          audience_language: Database["public"]["Enums"]["preferred_language"]
+          body: string
+          created_at: string
+          id: string
+          role_owner: Database["public"]["Enums"]["app_role"]
+          template_key: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience_language: Database["public"]["Enums"]["preferred_language"]
+          body: string
+          created_at?: string
+          id?: string
+          role_owner?: Database["public"]["Enums"]["app_role"]
+          template_key: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience_language?: Database["public"]["Enums"]["preferred_language"]
+          body?: string
+          created_at?: string
+          id?: string
+          role_owner?: Database["public"]["Enums"]["app_role"]
+          template_key?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      operation_logs: {
+        Row: {
+          candidate_id: string | null
+          created_at: string
+          follow_up_required: boolean
+          id: string
+          interaction_type: string
+          log_date: string
+          notes_amharic: string | null
+          notes_hebrew: string | null
+          notes_russian: string | null
+          operator_name: string
+          sentiment: string | null
+          source_message: string | null
+          translated_hebrew: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidate_id?: string | null
+          created_at?: string
+          follow_up_required?: boolean
+          id?: string
+          interaction_type?: string
+          log_date?: string
+          notes_amharic?: string | null
+          notes_hebrew?: string | null
+          notes_russian?: string | null
+          operator_name?: string
+          sentiment?: string | null
+          source_message?: string | null
+          translated_hebrew?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string | null
+          created_at?: string
+          follow_up_required?: boolean
+          id?: string
+          interaction_type?: string
+          log_date?: string
+          notes_amharic?: string | null
+          notes_hebrew?: string | null
+          notes_russian?: string | null
+          operator_name?: string
+          sentiment?: string | null
+          source_message?: string | null
+          translated_hebrew?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_logs_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "ceo" | "evp" | "coo" | "cfo" | "recruiter" | "viewer"
+      asset_status: "active" | "service_due" | "in_service" | "inactive"
+      bus_company: "Egged" | "Afikim"
+      candidate_city: "Ashkelon" | "Kiryat Gat"
+      candidate_stage: "Lead" | "Learning" | "Test" | "Placed"
+      finance_entry_type:
+        | "revenue_pending"
+        | "revenue_received"
+        | "maintenance_expense"
+        | "other_expense"
+      finance_status: "pending" | "paid" | "overdue" | "cancelled"
+      license_status:
+        | "Not Started"
+        | "Learning"
+        | "Theory Ready"
+        | "Test Scheduled"
+        | "Licensed"
+      preferred_language: "he" | "am" | "ru"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +482,27 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "ceo", "evp", "coo", "cfo", "recruiter", "viewer"],
+      asset_status: ["active", "service_due", "in_service", "inactive"],
+      bus_company: ["Egged", "Afikim"],
+      candidate_city: ["Ashkelon", "Kiryat Gat"],
+      candidate_stage: ["Lead", "Learning", "Test", "Placed"],
+      finance_entry_type: [
+        "revenue_pending",
+        "revenue_received",
+        "maintenance_expense",
+        "other_expense",
+      ],
+      finance_status: ["pending", "paid", "overdue", "cancelled"],
+      license_status: [
+        "Not Started",
+        "Learning",
+        "Theory Ready",
+        "Test Scheduled",
+        "Licensed",
+      ],
+      preferred_language: ["he", "am", "ru"],
+    },
   },
 } as const
