@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -15,13 +15,16 @@ import {
   RadioTower,
   Send,
   ShieldCheck,
+  UploadCloud,
   TrendingUp,
   UsersRound,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
 
 export const Route = createFileRoute("/")({
@@ -97,6 +100,10 @@ const copy = {
     translate: "תרגום ניהול לעברית",
     template: "סטטוס בשפת הנהג",
     askAi: "הצע צעד הבא",
+    importTitle: "ייבוא מועמדים",
+    importAction: "ייבא CSV / Excel",
+    importReady: "הקובץ מוכן לייבוא",
+    importDone: "ייבוא הושלם",
     emptyCandidates: "אין עדיין מועמדים במסד הנתונים.",
     emptyFinance: "אין עדיין רשומות כספים אמיתיות.",
     emptyAssets: "אין עדיין רכבי חברה במערכת.",
@@ -124,6 +131,10 @@ const copy = {
     translate: "ወደ ዕብራይስጥ ትርጉም",
     template: "በሹፌሩ ቋንቋ ሁኔታ",
     askAi: "ቀጣይ እርምጃ",
+    importTitle: "እጩዎችን አስመጣ",
+    importAction: "CSV / Excel አስመጣ",
+    importReady: "ፋይሉ ለማስመጣት ዝግጁ ነው",
+    importDone: "ማስመጣት ተጠናቋል",
     emptyCandidates: "በዳታቤዝ ውስጥ እጩዎች አልተገኙም።",
     emptyFinance: "የፋይናንስ መዝገቦች አልተገኙም።",
     emptyAssets: "የኩባንያ ተሽከርካሪዎች አልተገኙም።",
@@ -151,6 +162,10 @@ const copy = {
     translate: "Перевод на иврит",
     template: "Статус на языке водителя",
     askAi: "Следующий шаг",
+    importTitle: "Импорт кандидатов",
+    importAction: "Импорт CSV / Excel",
+    importReady: "Файл готов к импорту",
+    importDone: "Импорт завершен",
     emptyCandidates: "В базе пока нет кандидатов.",
     emptyFinance: "Финансовых записей пока нет.",
     emptyAssets: "Автомобилей компании пока нет.",
@@ -179,7 +194,12 @@ function Index() {
     "בחר מועמד אמיתי מהרשימה כדי להפעיל את שכבת ה-AI הרב-לשונית.",
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [importRows, setImportRows] = useState<Record<string, string | number | boolean | null>[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importStatus, setImportStatus] = useState("CSV / Excel: full_name, שם בעברית, שם באמהרית, שם ברוסית, phone, city.");
+  const [isImporting, setIsImporting] = useState(false);
   const generateText = useServerFn(generateHaileAiText);
+  const importCandidates = useServerFn(importCandidatesFromRows);
   const t = copy[language];
 
   useEffect(() => {
@@ -223,6 +243,17 @@ function Index() {
       active = false;
     };
   }, []);
+
+  const refreshCandidates = async () => {
+    const { data, error } = await supabase.from("candidates").select("*").order("created_at", { ascending: false });
+    if (error) {
+      setImportStatus(error.message);
+      return;
+    }
+    const realCandidates = (data ?? []).map(normalizeCandidate);
+    setCandidates(realCandidates);
+    setSelectedId(realCandidates[0]?.id ?? null);
+  };
 
   const selected =
     candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0] ?? null;
@@ -270,6 +301,45 @@ function Index() {
       setAiText(result.text);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const rows = await parseImportFile(file);
+      setImportRows(rows);
+      setImportFileName(file.name);
+      setImportStatus(`${t.importReady}: ${rows.length} שורות זוהו עם מיפוי אוטומטי.`);
+    } catch (error) {
+      setImportRows([]);
+      setImportFileName("");
+      setImportStatus(error instanceof Error ? error.message : "לא ניתן לקרוא את הקובץ.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const runCandidateImport = async () => {
+    if (importRows.length === 0) return;
+    setIsImporting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setImportStatus("יש להתחבר לפני ייבוא מועמדים.");
+        return;
+      }
+
+      const result = await importCandidates({ data: { accessToken, rows: importRows } });
+      setImportStatus(`${t.importDone}: ${result.inserted} נשמרו, ${result.skipped} דולגו${result.errors.length ? ` · ${result.errors.slice(0, 3).join(" · ")}` : ""}`);
+      setImportRows([]);
+      setImportFileName("");
+      await refreshCandidates();
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -365,13 +435,44 @@ function Index() {
                 <p className="text-sm font-bold text-primary">{t.ciel}</p>
                 <h2 className="text-2xl font-black">{t.pipeline}</h2>
               </div>
-              <Button
-                variant="command"
-                onClick={() => runAi("status_template")}
-                disabled={isLoading || !selected}
-              >
-                <Send className="h-4 w-4" /> {t.reminder}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="tactical" asChild>
+                  <label className="cursor-pointer">
+                    <UploadCloud className="h-4 w-4" /> {t.importAction}
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="sr-only"
+                      onChange={handleImportFile}
+                    />
+                  </label>
+                </Button>
+                <Button
+                  variant="command"
+                  onClick={() => runAi("status_template")}
+                  disabled={isLoading || !selected}
+                >
+                  <Send className="h-4 w-4" /> {t.reminder}
+                </Button>
+              </div>
+            </div>
+            <div className="mb-4 rounded-md border border-border bg-surface p-4 text-sm leading-6 text-muted-foreground">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <strong className="text-foreground">{t.importTitle}</strong>
+                  <p>{importFileName || importStatus}</p>
+                </div>
+                <Button
+                  variant="intel"
+                  size="sm"
+                  onClick={runCandidateImport}
+                  disabled={isImporting || importRows.length === 0}
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  {isImporting ? "מייבא..." : `${t.importAction} (${importRows.length})`}
+                </Button>
+              </div>
+              {importFileName && <p className="mt-2 text-primary">{importStatus}</p>}
             </div>
             {candidates.length === 0 ? (
               <EmptyState text={isDataLoading ? "טוען נתונים אמיתיים..." : t.emptyCandidates} />
@@ -581,6 +682,36 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     nextStep: row.next_step_due_at ? formatDate(row.next_step_due_at) : "לא נקבע",
     note,
   };
+}
+
+async function parseImportFile(file: File): Promise<Record<string, string | number | boolean | null>[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", raw: false });
+  const sheetName = workbook.SheetNames[0];
+
+  if (!sheetName) {
+    throw new Error("הקובץ ריק או לא תקין.");
+  }
+
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<Record<string, string | number | boolean | null>>(sheet, {
+    defval: "",
+    raw: false,
+  });
+
+  const cleanRows = rows
+    .map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key.trim(), typeof value === "string" ? value.trim() : value]),
+      ),
+    )
+    .filter((row) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
+
+  if (cleanRows.length === 0) {
+    throw new Error("לא נמצאו שורות מועמדים בקובץ.");
+  }
+
+  return cleanRows.slice(0, 500);
 }
 
 function normalizeName(value: Json, fallback: string): Record<Language, string> {
