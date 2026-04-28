@@ -338,7 +338,16 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "ceo" | "evp" | "coo" | "cfo" | "recruiter" | "viewer"
+      app_role:
+        | "admin"
+        | "ceo"
+        | "evp"
+        | "coo"
+        | "cfo"
+        | "recruiter"
+        | "viewer"
+        | "super_admin"
+        | "operator"
       asset_status: "active" | "service_due" | "in_service" | "inactive"
       bus_company: "Egged" | "Afikim"
       candidate_city: "Ashkelon" | "Kiryat Gat"
@@ -483,7 +492,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "ceo", "evp", "coo", "cfo", "recruiter", "viewer"],
+      app_role: [
+        "admin",
+        "ceo",
+        "evp",
+        "coo",
+        "cfo",
+        "recruiter",
+        "viewer",
+        "super_admin",
+        "operator",
+      ],
       asset_status: ["active", "service_due", "in_service", "inactive"],
       bus_company: ["Egged", "Afikim"],
       candidate_city: ["Ashkelon", "Kiryat Gat"],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -10,16 +10,19 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronLeft,
+  Download,
   FileText,
   Gauge,
   Home,
   KeyRound,
   Languages,
+  LogOut,
   Mail,
   Menu,
   Mic,
   Phone,
   Search,
+  Save,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -33,6 +36,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
 
@@ -80,6 +84,21 @@ type Candidate = {
   documentsReady: boolean;
   note: string;
 };
+type AppRole = "super_admin" | "operator" | "viewer";
+type AuthUser = { id: string; email: string; role: AppRole | null };
+type CandidateForm = {
+  name: string;
+  phone: string;
+  age: string;
+  city: "Ashkelon" | "Kiryat Gat";
+  language: "he" | "am" | "ru";
+  stage: "Lead" | "Learning" | "Test" | "Placed";
+  licenseStatus: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
+  note: string;
+  idDocument: boolean;
+  greenForm: boolean;
+};
+type AuthMode = "login" | "firstAdmin";
 
 const navItems: Array<{
   key: PageKey;
@@ -108,6 +127,10 @@ const stageLabels: Record<string, string> = {
 
 function HaileApp() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authStatus, setAuthStatus] = useState("יש להתחבר כדי להפעיל את המערכת.");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -125,12 +148,38 @@ function HaileApp() {
   const [isImporting, setIsImporting] = useState(false);
   const [aiText, setAiText] = useState("בחר מועמד כדי להפעיל תרגום או ניסוח הודעה.");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
+  const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
+  const createAdmin = useServerFn(createFirstSuperAdmin);
+  const inviteUser = useServerFn(inviteSystemUser);
 
   useEffect(() => {
-    void loadLiveData();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      setTimeout(() => void refreshAuth(), 0);
+    });
+    void refreshAuth();
+    return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (authUser) void loadLiveData();
+  }, [authUser?.id]);
+
+  const refreshAuth = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      setAuthUser(null);
+      setAuthChecked(true);
+      return;
+    }
+
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
+    const role = pickRole((roles ?? []).map((item) => item.role));
+    setAuthUser({ id: data.user.id, email: data.user.email ?? "", role });
+    setAuthChecked(true);
+  };
 
   const loadLiveData = async () => {
     setIsLoadingData(true);
@@ -246,6 +295,106 @@ function HaileApp() {
     }
   };
 
+  const saveCandidate = async () => {
+    if (!candidateForm.name.trim() || !candidateForm.phone.trim()) {
+      setActionStatus("שם וטלפון הם שדות חובה.");
+      return;
+    }
+
+    const { error } = await supabase.from("candidates").insert({
+      full_name: { he: candidateForm.name, am: candidateForm.name, ru: candidateForm.name },
+      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+      age: candidateForm.age ? Number(candidateForm.age) : null,
+      city: candidateForm.city,
+      preferred_language: candidateForm.language,
+      stage: candidateForm.stage,
+      license_status: candidateForm.licenseStatus,
+      documents: {
+        id: { received: candidateForm.idDocument, url: null },
+        green_form: { received: candidateForm.greenForm, url: null },
+      },
+      localized_profile: { he: { note: candidateForm.note }, am: {}, ru: {} },
+    });
+
+    if (error) {
+      setActionStatus(`שמירת מועמד נכשלה: ${error.message}`);
+      return;
+    }
+
+    setCandidateForm(emptyCandidateForm());
+    setActionStatus("המועמד נשמר בהצלחה.");
+    await loadLiveData();
+  };
+
+  const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
+    if (!selected) return;
+    const { error } = await supabase.from("candidates").update({ stage }).eq("id", selected.id);
+    setActionStatus(error ? `עדכון סטטוס נכשל: ${error.message}` : "סטטוס המועמד עודכן.");
+    if (!error) await loadLiveData();
+  };
+
+  const exportCandidates = () => {
+    const rows = candidates.map((candidate) => ({
+      שם: candidate.name,
+      טלפון: formatPhone(candidate.phone),
+      עיר: candidate.city,
+      שפה: candidate.language,
+      סטטוס: stageLabels[candidate.stage] ?? candidate.stage,
+      רישיון: candidate.licenseStatus,
+      מסמכים: candidate.documentsReady ? "תקין" : "חסר",
+      תאריך: formatDate(candidate.createdAt),
+    }));
+    downloadCsv("haile-candidates.csv", rows);
+    setActionStatus("קובץ המועמדים ירד למחשב.");
+  };
+
+  const handleInvite = async (email: string, password: string, role: "operator" | "viewer") => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר כמנהל ראשי.");
+      return;
+    }
+    const result = await inviteUser({ data: { accessToken, email, password, role } });
+    setActionStatus(result.message);
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    setAuthStatus("מתחבר...");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthStatus(error ? "פרטי התחברות לא תקינים." : "התחברת בהצלחה.");
+  };
+
+  const handleFirstAdmin = async (email: string, password: string, fullName: string) => {
+    setAuthStatus("יוצר מנהל ראשי...");
+    const result = await createAdmin({ data: { email, password, fullName } });
+    setAuthStatus(result.message);
+    if (result.ok) setAuthMode("login");
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCandidates([]);
+    setLogs([]);
+    setAuthStatus("התנתקת מהמערכת.");
+  };
+
+  if (!authChecked) {
+    return <LoadingScreen text="בודק הרשאות..." />;
+  }
+
+  if (!authUser) {
+    return (
+      <AuthScreen
+        mode={authMode}
+        status={authStatus}
+        onMode={setAuthMode}
+        onLogin={handleLogin}
+        onFirstAdmin={handleFirstAdmin}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground" dir="rtl">
       <div className="flex min-h-screen">
@@ -259,7 +408,9 @@ function HaileApp() {
               </div>
               <div>
                 <strong className="block text-lg">היילה AI</strong>
-                <span className="text-xs text-muted-foreground">בני אספה · SUPER_ADMIN</span>
+                <span className="text-xs text-muted-foreground">
+                  {authUser.email} · {roleLabel(authUser.role)}
+                </span>
               </div>
             </div>
             <button
@@ -330,6 +481,9 @@ function HaileApp() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-success" />
               עברית · RTL · נתונים אמיתיים בלבד
             </div>
+            <Button variant="tactical" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" /> יציאה
+            </Button>
           </header>
 
           <div className="mx-auto w-full max-w-7xl px-4 py-5 lg:px-7">
@@ -361,6 +515,11 @@ function HaileApp() {
                 onFile={handleImportFile}
                 onImport={runCandidateImport}
                 onAi={runAi}
+                form={candidateForm}
+                onFormChange={setCandidateForm}
+                onSaveCandidate={saveCandidate}
+                onStageChange={updateSelectedStage}
+                actionStatus={actionStatus}
                 aiText={aiText}
                 isAiLoading={isAiLoading}
               />
@@ -370,12 +529,153 @@ function HaileApp() {
             {activePage === "sol" && <SolPage />}
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
-            {activePage === "settings" && <SettingsPage />}
-            {activePage === "admin" && <AdminUsersPage />}
+            {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
+            {activePage === "admin" && <AdminUsersPage onInvite={handleInvite} status={actionStatus} />}
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function AuthScreen({
+  mode,
+  status,
+  onMode,
+  onLogin,
+  onFirstAdmin,
+}: {
+  mode: AuthMode;
+  status: string;
+  onMode: (mode: AuthMode) => void;
+  onLogin: (email: string, password: string) => void;
+  onFirstAdmin: (email: string, password: string, fullName: string) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("בני אספה");
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (mode === "firstAdmin") onFirstAdmin(email, password, fullName);
+    else onLogin(email, password);
+  };
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground" dir="rtl">
+      <form onSubmit={submit} className="glass-panel w-full max-w-md rounded-lg p-6">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black">היילה AI</h1>
+            <p className="text-sm text-muted-foreground">כניסה מאובטחת למערכת ניהול אמיתית</p>
+          </div>
+        </div>
+        {mode === "firstAdmin" && (
+          <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
+        )}
+        <Field label="אימייל" value={email} onChange={setEmail} type="email" />
+        <Field label="סיסמה" value={password} onChange={setPassword} type="password" />
+        <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
+          <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
+        </Button>
+        <button
+          type="button"
+          onClick={() => onMode(mode === "login" ? "firstAdmin" : "login")}
+          className="mt-4 w-full text-center text-sm font-bold text-primary"
+        >
+          {mode === "login" ? "אין משתמש? הגדרת מנהל ראשי ראשון" : "חזרה לכניסה"}
+        </button>
+        <p className="mt-4 rounded-md border border-border bg-surface p-3 text-sm text-muted-foreground">
+          {status}
+        </p>
+      </form>
+    </main>
+  );
+}
+
+function LoadingScreen({ text }: { text: string }) {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background text-foreground" dir="rtl">
+      <div className="glass-panel rounded-lg p-6 text-sm text-muted-foreground">{text}</div>
+    </main>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="mb-3 block text-sm font-bold">
+      {label}
+      <input
+        required
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-primary"
+      />
+    </label>
+  );
+}
+
+function SmallInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block text-xs font-bold text-muted-foreground">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+      />
+    </label>
+  );
+}
+
+function SmallSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block text-xs font-bold text-muted-foreground">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -481,6 +781,11 @@ function CandidatesPage({
   onFile,
   onImport,
   onAi,
+  form,
+  onFormChange,
+  onSaveCandidate,
+  onStageChange,
+  actionStatus,
   aiText,
   isAiLoading,
 }: {
@@ -497,6 +802,11 @@ function CandidatesPage({
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  form: CandidateForm;
+  onFormChange: (form: CandidateForm) => void;
+  onSaveCandidate: () => void;
+  onStageChange: (stage: CandidateForm["stage"]) => void;
+  actionStatus: string;
   aiText: string;
   isAiLoading: boolean;
 }) {
@@ -551,12 +861,15 @@ function CandidatesPage({
       </Panel>
 
       <Panel title="פרופיל מועמד + CIEL">
+        <Notice tone="success" text={actionStatus} />
+        <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} />
         {!selected ? (
           <EmptyState text="בחר מועמד כדי לפתוח פרופיל." />
         ) : (
           <CandidateProfile
             candidate={selected}
             onAi={onAi}
+            onStageChange={onStageChange}
             aiText={aiText}
             isAiLoading={isAiLoading}
           />
@@ -588,6 +901,35 @@ function AgentsPage() {
       {agents.map((agent) => (
         <AgentCard key={agent.name} {...agent} />
       ))}
+    </div>
+  );
+}
+
+function QuickCandidateForm({
+  form,
+  onChange,
+  onSave,
+}: {
+  form: CandidateForm;
+  onChange: (form: CandidateForm) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <SmallInput label="שם מלא" value={form.name} onChange={(name) => onChange({ ...form, name })} />
+        <SmallInput label="טלפון" value={form.phone} onChange={(phone) => onChange({ ...form, phone })} />
+        <SmallInput label="גיל" value={form.age} onChange={(age) => onChange({ ...form, age })} />
+        <SmallSelect label="עיר" value={form.city} options={["Ashkelon", "Kiryat Gat"]} onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })} />
+        <SmallSelect label="שפה" value={form.language} options={["he", "am", "ru"]} onChange={(language) => onChange({ ...form, language: language as CandidateForm["language"] })} />
+        <SmallSelect label="שלב" value={form.stage} options={["Lead", "Learning", "Test", "Placed"]} onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })} />
+      </div>
+      <SmallInput label="הערה" value={form.note} onChange={(note) => onChange({ ...form, note })} />
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <label><input type="checkbox" checked={form.idDocument} onChange={(event) => onChange({ ...form, idDocument: event.target.checked })} /> תעודת זהות</label>
+        <label><input type="checkbox" checked={form.greenForm} onChange={(event) => onChange({ ...form, greenForm: event.target.checked })} /> טופס ירוק</label>
+      </div>
+      <Button variant="command" onClick={onSave}><Save className="h-4 w-4" /> שמור מועמד</Button>
     </div>
   );
 }
@@ -687,7 +1029,7 @@ function ReportsPage() {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ onExport }: { onExport: () => void }) {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Panel title="פרופיל מנכ״ל">
@@ -714,25 +1056,37 @@ function SettingsPage() {
         />
       </Panel>
       <Panel title="גיבוי נתונים">
-        <Button variant="tactical">
-          <UploadCloud className="h-4 w-4" /> ייצוא CSV של מועמדים
+        <Button variant="tactical" onClick={onExport}>
+          <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
         </Button>
       </Panel>
     </div>
   );
 }
 
-function AdminUsersPage() {
+function AdminUsersPage({
+  onInvite,
+  status,
+}: {
+  onInvite: (email: string, password: string, role: "operator" | "viewer") => void;
+  status: string;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"operator" | "viewer">("operator");
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
       <Panel title="משתמשים פעילים">
         <EmptyState text="אין משתמשים פעילים להצגה עד שיוגדר מנהל ראשון." />
       </Panel>
       <Panel title="הזמנת משתמש חדש">
-        <SettingsGrid items={["מייל", "תפקיד: OPERATOR / VIEWER", "תוקף הזמנה: עד 48 שעות"]} />
-        <Button className="mt-4 min-h-11" variant="command">
+        <SmallInput label="מייל" value={email} onChange={setEmail} />
+        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} />
+        <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
+        <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
           <UserPlus className="h-4 w-4" /> שלח הזמנה
         </Button>
+        <p className="mt-3 text-sm text-muted-foreground">{status}</p>
       </Panel>
       <Panel title="הזמנות ממתינות">
         <EmptyState text="אין הזמנות ממתינות." />
@@ -799,11 +1153,13 @@ function CandidateCard({
 function CandidateProfile({
   candidate,
   onAi,
+  onStageChange,
   aiText,
   isAiLoading,
 }: {
   candidate: Candidate;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onStageChange: (stage: CandidateForm["stage"]) => void;
   aiText: string;
   isAiLoading: boolean;
 }) {
@@ -831,6 +1187,11 @@ function CandidateProfile({
         {isAiLoading ? "AI מנתח..." : aiText}
       </div>
       <div className="flex flex-wrap gap-2">
+        {(["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
+          <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
+            {stageLabels[stage]}
+          </Button>
+        ))}
         <Button variant="command" onClick={() => onAi("candidate_next_step")}>
           <Bot className="h-4 w-4" /> הצע צעד הבא
         </Button>
@@ -1143,6 +1504,50 @@ function gradeFromScore(score: number | null): Candidate["grade"] {
   if (score >= 8) return "A";
   if (score >= 5) return "B";
   return "C";
+}
+
+function pickRole(roles: string[]): AppRole | null {
+  if (roles.includes("super_admin")) return "super_admin";
+  if (roles.includes("operator")) return "operator";
+  if (roles.includes("viewer")) return "viewer";
+  return null;
+}
+
+function roleLabel(role: AppRole | null) {
+  if (role === "super_admin") return "SUPER_ADMIN";
+  if (role === "operator") return "OPERATOR";
+  if (role === "viewer") return "VIEWER";
+  return "ללא תפקיד";
+}
+
+function emptyCandidateForm(): CandidateForm {
+  return {
+    name: "",
+    phone: "",
+    age: "",
+    city: "Ashkelon",
+    language: "am",
+    stage: "Lead",
+    licenseStatus: "Not Started",
+    note: "",
+    idDocument: false,
+    greenForm: false,
+  };
+}
+
+function downloadCsv(filename: string, rows: Record<string, string | number | boolean>[]) {
+  const headers = Object.keys(rows[0] ?? { ריק: "" });
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(",")),
+  ].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function average(values: number[]) {
