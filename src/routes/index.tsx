@@ -374,12 +374,21 @@ function Index() {
               </h1>
             </div>
           </div>
-          <nav className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            {t.nav.map((item) => (
-              <span key={item} className="rounded-md border border-border bg-surface px-3 py-2">
-                {item}
-              </span>
-            ))}
+          <nav className="grid grid-cols-2 gap-2 text-sm text-muted-foreground sm:flex sm:flex-wrap sm:items-center">
+            {workspaces.map((workspace) => {
+              const Icon = workspace.icon;
+              return (
+                <button
+                  key={workspace.key}
+                  type="button"
+                  onClick={() => setActiveWorkspace(workspace.key)}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 py-2 font-bold transition ${activeWorkspace === workspace.key ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "border-border bg-surface text-muted-foreground hover:bg-surface-strong hover:text-foreground"}`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {workspace.label}
+                </button>
+              );
+            })}
           </nav>
           <div className="flex rounded-md border border-border bg-surface p-1">
             {(["he", "am", "ru"] as Language[]).map((item) => (
