@@ -979,7 +979,7 @@ function ReportsPage() {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ onExport }: { onExport: () => void }) {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Panel title="פרופיל מנכ״ל">
@@ -1006,25 +1006,37 @@ function SettingsPage() {
         />
       </Panel>
       <Panel title="גיבוי נתונים">
-        <Button variant="tactical">
-          <UploadCloud className="h-4 w-4" /> ייצוא CSV של מועמדים
+        <Button variant="tactical" onClick={onExport}>
+          <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
         </Button>
       </Panel>
     </div>
   );
 }
 
-function AdminUsersPage() {
+function AdminUsersPage({
+  onInvite,
+  status,
+}: {
+  onInvite: (email: string, password: string, role: "operator" | "viewer") => void;
+  status: string;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"operator" | "viewer">("operator");
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
       <Panel title="משתמשים פעילים">
         <EmptyState text="אין משתמשים פעילים להצגה עד שיוגדר מנהל ראשון." />
       </Panel>
       <Panel title="הזמנת משתמש חדש">
-        <SettingsGrid items={["מייל", "תפקיד: OPERATOR / VIEWER", "תוקף הזמנה: עד 48 שעות"]} />
-        <Button className="mt-4 min-h-11" variant="command">
+        <SmallInput label="מייל" value={email} onChange={setEmail} />
+        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} />
+        <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
+        <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
           <UserPlus className="h-4 w-4" /> שלח הזמנה
         </Button>
+        <p className="mt-3 text-sm text-muted-foreground">{status}</p>
       </Panel>
       <Panel title="הזמנות ממתינות">
         <EmptyState text="אין הזמנות ממתינות." />
