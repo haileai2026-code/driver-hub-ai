@@ -1520,6 +1520,36 @@ function roleLabel(role: AppRole | null) {
   return "ללא תפקיד";
 }
 
+function emptyCandidateForm(): CandidateForm {
+  return {
+    name: "",
+    phone: "",
+    age: "",
+    city: "Ashkelon",
+    language: "am",
+    stage: "Lead",
+    licenseStatus: "Not Started",
+    note: "",
+    idDocument: false,
+    greenForm: false,
+  };
+}
+
+function downloadCsv(filename: string, rows: Record<string, string | number | boolean>[]) {
+  const headers = Object.keys(rows[0] ?? { ריק: "" });
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(",")),
+  ].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function average(values: number[]) {
   if (!values.length) return null;
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
