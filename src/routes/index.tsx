@@ -48,6 +48,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Language = "he" | "am" | "ru";
+type Workspace = "command" | "candidates" | "operations" | "finance";
 type Stage = Tables<"candidates">["stage"];
 type CandidateRow = Tables<"candidates">;
 type FinanceRow = Tables<"finance_entries">;
@@ -183,6 +184,7 @@ const stageTone: Record<Stage, string> = {
 
 function Index() {
   const [language, setLanguage] = useState<Language>("he");
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>("candidates");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [finance, setFinance] = useState<FinanceSummary[]>([]);
@@ -201,6 +203,15 @@ function Index() {
   const generateText = useServerFn(generateHaileAiText);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const t = copy[language];
+  const workspaces = useMemo(
+    () => [
+      { key: "command" as const, label: t.nav[0], icon: RadioTower },
+      { key: "candidates" as const, label: "מועמדים", icon: UsersRound },
+      { key: "operations" as const, label: "תפעול", icon: MessageSquareText },
+      { key: "finance" as const, label: "פיננסים", icon: Banknote },
+    ],
+    [t.nav],
+  );
 
   useEffect(() => {
     let active = true;
