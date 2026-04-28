@@ -293,6 +293,42 @@ function HaileApp() {
     }
   };
 
+  const handleLogin = async (email: string, password: string) => {
+    setAuthStatus("מתחבר...");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthStatus(error ? "פרטי התחברות לא תקינים." : "התחברת בהצלחה.");
+  };
+
+  const handleFirstAdmin = async (email: string, password: string, fullName: string) => {
+    setAuthStatus("יוצר מנהל ראשי...");
+    const result = await createAdmin({ data: { email, password, fullName } });
+    setAuthStatus(result.message);
+    if (result.ok) setAuthMode("login");
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCandidates([]);
+    setLogs([]);
+    setAuthStatus("התנתקת מהמערכת.");
+  };
+
+  if (!authChecked) {
+    return <LoadingScreen text="בודק הרשאות..." />;
+  }
+
+  if (!authUser) {
+    return (
+      <AuthScreen
+        mode={authMode}
+        status={authStatus}
+        onMode={setAuthMode}
+        onLogin={handleLogin}
+        onFirstAdmin={handleFirstAdmin}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground" dir="rtl">
       <div className="flex min-h-screen">
@@ -306,7 +342,9 @@ function HaileApp() {
               </div>
               <div>
                 <strong className="block text-lg">היילה AI</strong>
-                <span className="text-xs text-muted-foreground">בני אספה · SUPER_ADMIN</span>
+                <span className="text-xs text-muted-foreground">
+                  {authUser.email} · {roleLabel(authUser.role)}
+                </span>
               </div>
             </div>
             <button
@@ -377,6 +415,9 @@ function HaileApp() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-success" />
               עברית · RTL · נתונים אמיתיים בלבד
             </div>
+            <Button variant="tactical" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" /> יציאה
+            </Button>
           </header>
 
           <div className="mx-auto w-full max-w-7xl px-4 py-5 lg:px-7">
