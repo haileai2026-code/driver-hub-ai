@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -36,7 +43,12 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
-import { createCandidate, getAuthorizedSession, getLiveAppData, updateCandidateStage } from "@/lib/app-data.functions";
+import {
+  createCandidate,
+  getAuthorizedSession,
+  getLiveAppData,
+  updateCandidateStage,
+} from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
@@ -568,7 +580,9 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
-            {activePage === "admin" && <AdminUsersPage onInvite={handleInvite} status={actionStatus} />}
+            {activePage === "admin" && (
+              <AdminUsersPage onInvite={handleInvite} status={actionStatus} />
+            )}
           </div>
         </section>
       </div>
@@ -600,7 +614,10 @@ function AuthScreen({
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground" dir="rtl">
+    <main
+      className="grid min-h-screen place-items-center bg-background p-4 text-foreground"
+      dir="rtl"
+    >
       <form onSubmit={submit} className="glass-panel w-full max-w-md rounded-lg p-6">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground">
@@ -615,7 +632,13 @@ function AuthScreen({
           <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
         )}
         <Field label="אימייל" value={email} onChange={setEmail} type="email" />
-        <Field label="סיסמה" value={password} onChange={setPassword} type="password" minLength={mode === "firstAdmin" ? 8 : undefined} />
+        <Field
+          label="סיסמה"
+          value={password}
+          onChange={setPassword}
+          type="password"
+          minLength={mode === "firstAdmin" ? 8 : undefined}
+        />
         <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
           <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
         </Button>
@@ -964,19 +987,60 @@ function QuickCandidateForm({
   return (
     <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
       <div className="grid gap-2 sm:grid-cols-2">
-        <SmallInput label="שם מלא" value={form.name} onChange={(name) => onChange({ ...form, name })} />
-        <SmallInput label="טלפון" value={form.phone} onChange={(phone) => onChange({ ...form, phone })} />
+        <SmallInput
+          label="שם מלא"
+          value={form.name}
+          onChange={(name) => onChange({ ...form, name })}
+        />
+        <SmallInput
+          label="טלפון"
+          value={form.phone}
+          onChange={(phone) => onChange({ ...form, phone })}
+        />
         <SmallInput label="גיל" value={form.age} onChange={(age) => onChange({ ...form, age })} />
-        <SmallSelect label="עיר" value={form.city} options={["Ashkelon", "Kiryat Gat"]} onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })} />
-        <SmallSelect label="שפה" value={form.language} options={["he", "am", "ru"]} onChange={(language) => onChange({ ...form, language: language as CandidateForm["language"] })} />
-        <SmallSelect label="שלב" value={form.stage} options={["Lead", "Learning", "Test", "Placed"]} onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })} />
+        <SmallSelect
+          label="עיר"
+          value={form.city}
+          options={["Ashkelon", "Kiryat Gat"]}
+          onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
+        />
+        <SmallSelect
+          label="שפה"
+          value={form.language}
+          options={["he", "am", "ru"]}
+          onChange={(language) =>
+            onChange({ ...form, language: language as CandidateForm["language"] })
+          }
+        />
+        <SmallSelect
+          label="שלב"
+          value={form.stage}
+          options={["Lead", "Learning", "Test", "Placed"]}
+          onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })}
+        />
       </div>
       <SmallInput label="הערה" value={form.note} onChange={(note) => onChange({ ...form, note })} />
       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-        <label><input type="checkbox" checked={form.idDocument} onChange={(event) => onChange({ ...form, idDocument: event.target.checked })} /> תעודת זהות</label>
-        <label><input type="checkbox" checked={form.greenForm} onChange={(event) => onChange({ ...form, greenForm: event.target.checked })} /> טופס ירוק</label>
+        <label>
+          <input
+            type="checkbox"
+            checked={form.idDocument}
+            onChange={(event) => onChange({ ...form, idDocument: event.target.checked })}
+          />{" "}
+          תעודת זהות
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={form.greenForm}
+            onChange={(event) => onChange({ ...form, greenForm: event.target.checked })}
+          />{" "}
+          טופס ירוק
+        </label>
       </div>
-      <Button variant="command" onClick={onSave}><Save className="h-4 w-4" /> שמור מועמד</Button>
+      <Button variant="command" onClick={onSave}>
+        <Save className="h-4 w-4" /> שמור מועמד
+      </Button>
     </div>
   );
 }
@@ -1128,9 +1192,24 @@ function AdminUsersPage({
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
-        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} type="password" minLength={8} />
-        <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
-        <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
+        <SmallInput
+          label="סיסמה זמנית"
+          value={password}
+          onChange={setPassword}
+          type="password"
+          minLength={8}
+        />
+        <SmallSelect
+          label="תפקיד"
+          value={role}
+          options={["operator", "viewer"]}
+          onChange={(value: string) => setRole(value as "operator" | "viewer")}
+        />
+        <Button
+          className="mt-4 min-h-11"
+          variant="command"
+          onClick={() => onInvite(email, password, role)}
+        >
           <UserPlus className="h-4 w-4" /> שלח הזמנה
         </Button>
         <p className="mt-3 text-sm text-muted-foreground">{status}</p>
@@ -1579,7 +1658,9 @@ function downloadCsv(filename: string, rows: Record<string, string | number | bo
   const headers = Object.keys(rows[0] ?? { ריק: "" });
   const csv = [
     headers.join(","),
-    ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(",")),
+    ...rows.map((row) =>
+      headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(","),
+    ),
   ].join("\n");
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

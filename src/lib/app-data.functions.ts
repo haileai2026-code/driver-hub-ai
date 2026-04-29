@@ -26,7 +26,8 @@ type AppRole = "super_admin" | "operator" | "viewer";
 
 async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
   const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
-  if (authError || !userData.user) return { ok: false as const, message: "יש להתחבר עם משתמש מורשה." };
+  if (authError || !userData.user)
+    return { ok: false as const, message: "יש להתחבר עם משתמש מורשה." };
 
   const { data: roleRow, error: roleError } = await supabaseAdmin
     .from("user_roles")
@@ -44,7 +45,9 @@ async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
 
 export const getAuthorizedSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
-  .handler(async ({ data }) => getAuthorizedUser(data.accessToken, ["super_admin", "operator", "viewer"]));
+  .handler(async ({ data }) =>
+    getAuthorizedUser(data.accessToken, ["super_admin", "operator", "viewer"]),
+  );
 
 export const getLiveAppData = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
@@ -54,19 +57,28 @@ export const getLiveAppData = createServerFn({ method: "POST" })
 
     const [candidateResult, logResult] = await Promise.all([
       supabaseAdmin.from("candidates").select("*").order("created_at", { ascending: false }),
-      supabaseAdmin.from("operation_logs").select("*").order("created_at", { ascending: false }).limit(8),
+      supabaseAdmin
+        .from("operation_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(8),
     ]);
 
     if (candidateResult.error || logResult.error) {
       return {
         ok: false as const,
-        message: candidateResult.error?.message ?? logResult.error?.message ?? "טעינת הנתונים נכשלה.",
+        message:
+          candidateResult.error?.message ?? logResult.error?.message ?? "טעינת הנתונים נכשלה.",
         candidates: [],
         logs: [],
       };
     }
 
-    return { ok: true as const, candidates: candidateResult.data ?? [], logs: logResult.data ?? [] };
+    return {
+      ok: true as const,
+      candidates: candidateResult.data ?? [],
+      logs: logResult.data ?? [],
+    };
   });
 
 export const createCandidate = createServerFn({ method: "POST" })
@@ -97,7 +109,10 @@ export const updateCandidateStage = createServerFn({ method: "POST" })
     const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
     if (!auth.ok) return { ok: false as const, message: auth.message };
 
-    const { error } = await supabaseAdmin.from("candidates").update({ stage: data.stage }).eq("id", data.id);
+    const { error } = await supabaseAdmin
+      .from("candidates")
+      .update({ stage: data.stage })
+      .eq("id", data.id);
     return error
       ? { ok: false as const, message: error.message }
       : { ok: true as const, message: "סטטוס המועמד עודכן." };
