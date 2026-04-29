@@ -58,16 +58,20 @@ export type Database = {
           assigned_to: string | null
           city: Database["public"]["Enums"]["candidate_city"]
           created_at: string
+          created_by: string | null
           documents: Json
           full_name: Json
           id: string
           last_contacted_at: string | null
+          license: string | null
           license_status: Database["public"]["Enums"]["license_status"]
           localized_profile: Json
+          name: string
           next_step_due_at: string | null
+          notes: string | null
           phone: string
           preferred_language: Database["public"]["Enums"]["preferred_language"]
-          stage: Database["public"]["Enums"]["candidate_stage"]
+          stage: string
           updated_at: string
         }
         Insert: {
@@ -75,16 +79,20 @@ export type Database = {
           assigned_to?: string | null
           city: Database["public"]["Enums"]["candidate_city"]
           created_at?: string
+          created_by?: string | null
           documents?: Json
           full_name?: Json
           id?: string
           last_contacted_at?: string | null
+          license?: string | null
           license_status?: Database["public"]["Enums"]["license_status"]
           localized_profile?: Json
+          name: string
           next_step_due_at?: string | null
+          notes?: string | null
           phone: string
           preferred_language?: Database["public"]["Enums"]["preferred_language"]
-          stage?: Database["public"]["Enums"]["candidate_stage"]
+          stage?: string
           updated_at?: string
         }
         Update: {
@@ -92,16 +100,20 @@ export type Database = {
           assigned_to?: string | null
           city?: Database["public"]["Enums"]["candidate_city"]
           created_at?: string
+          created_by?: string | null
           documents?: Json
           full_name?: Json
           id?: string
           last_contacted_at?: string | null
+          license?: string | null
           license_status?: Database["public"]["Enums"]["license_status"]
           localized_profile?: Json
+          name?: string
           next_step_due_at?: string | null
+          notes?: string | null
           phone?: string
           preferred_language?: Database["public"]["Enums"]["preferred_language"]
-          stage?: Database["public"]["Enums"]["candidate_stage"]
+          stage?: string
           updated_at?: string
         }
         Relationships: []
@@ -300,19 +312,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: string
           user_id?: string
         }
         Relationships: []
@@ -322,20 +334,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_any_role: {
-        Args: {
-          _roles: Database["public"]["Enums"]["app_role"][]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_any_role:
+        | {
+            Args: {
+              _roles: Database["public"]["Enums"]["app_role"][]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { _roles: string[]; _user_id: string }; Returns: boolean }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { _role: string; _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:

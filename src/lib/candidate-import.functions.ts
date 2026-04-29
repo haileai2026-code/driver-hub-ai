@@ -94,24 +94,16 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
   const noteHe = read(row, headerMap.notesHe);
   const noteAm = read(row, headerMap.notesAm);
   const noteRu = read(row, headerMap.notesRu);
+  const name = nameHe || nameAm || nameRu || phone;
 
   return {
-    full_name: { he: nameHe || phone, am: nameAm || nameHe || phone, ru: nameRu || nameHe || phone },
+    name,
     age: normalizeAge(read(row, headerMap.age)),
     city: normalizeCity(read(row, headerMap.city)),
     phone,
-    license_status: normalizeLicense(read(row, headerMap.license)),
+    license: normalizeLicense(read(row, headerMap.license)),
     stage: normalizeStage(read(row, headerMap.stage)),
-    preferred_language: normalizeLanguage(read(row, headerMap.language)),
-    documents: {
-      id: { received: normalizeBoolean(read(row, headerMap.idDoc)), url: null },
-      green_form: { received: normalizeBoolean(read(row, headerMap.greenDoc)), url: null },
-    },
-    localized_profile: {
-      he: noteHe ? { note: noteHe } : {},
-      am: noteAm ? { note: noteAm } : {},
-      ru: noteRu ? { note: noteRu } : {},
-    },
+    notes: [noteHe, noteAm, noteRu].filter(Boolean).join("\n") || null,
   };
 }
 
