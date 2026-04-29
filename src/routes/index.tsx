@@ -1755,6 +1755,27 @@ function emptyCandidateForm(): CandidateForm {
   };
 }
 
+function candidateToForm(candidate: Candidate): CandidateForm {
+  return {
+    name: candidate.name,
+    phone: candidate.phone,
+    age: candidate.age ? String(candidate.age) : "",
+    city: candidate.city === "Kiryat Gat" ? "Kiryat Gat" : "Ashkelon",
+    language: candidate.language === "עברית" ? "he" : candidate.language === "רוסית" ? "ru" : "am",
+    stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(candidate.stage as CandidateForm["stage"])
+      ? (candidate.stage as CandidateForm["stage"])
+      : "Lead",
+    licenseStatus: (["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const).includes(
+      candidate.licenseStatus as CandidateForm["licenseStatus"],
+    )
+      ? (candidate.licenseStatus as CandidateForm["licenseStatus"])
+      : "Not Started",
+    note: candidate.note,
+    idDocument: candidate.documentsReady,
+    greenForm: candidate.documentsReady,
+  };
+}
+
 function downloadCsv(filename: string, rows: Record<string, string | number | boolean>[]) {
   const headers = Object.keys(rows[0] ?? { ריק: "" });
   const csv = [
