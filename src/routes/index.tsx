@@ -27,12 +27,14 @@ import {
   Mail,
   Menu,
   Mic,
+  Pencil,
   Phone,
   Search,
   Save,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   UploadCloud,
   UserPlus,
   UsersRound,
@@ -45,8 +47,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import {
   createCandidate,
+  deleteCandidate,
   getAuthorizedSession,
   getLiveAppData,
+  updateCandidate,
   updateCandidateStage,
 } from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
@@ -87,6 +91,7 @@ type Candidate = {
   id: string;
   name: string;
   phone: string;
+  age: number | null;
   city: string;
   language: string;
   licenseStatus: string;
@@ -99,6 +104,7 @@ type Candidate = {
 };
 type AppRole = "super_admin" | "operator" | "viewer";
 type AuthUser = { id: string; email: string; role: AppRole | null };
+type SystemUser = { id: string; email: string; role: string; created_at: string };
 type CandidateForm = {
   name: string;
   phone: string;
