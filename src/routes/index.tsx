@@ -916,6 +916,7 @@ function CandidatesPage({
   onSelect,
   onFile,
   onImport,
+  onExport,
   onAi,
   form,
   onFormChange,
@@ -941,6 +942,7 @@ function CandidatesPage({
   onSelect: (id: string) => void;
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
+  onExport: () => void;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
   form: CandidateForm;
   onFormChange: (form: CandidateForm) => void;
@@ -965,6 +967,8 @@ function CandidatesPage({
             isImporting={isImporting}
             onFile={onFile}
             onImport={onImport}
+            onExport={onExport}
+            canEdit={canEdit}
           />
         }
       >
