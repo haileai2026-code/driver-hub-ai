@@ -283,6 +283,10 @@ function HaileApp() {
   };
 
   const runCandidateImport = async () => {
+    if (!canEdit) {
+      setImportStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
     if (importRows.length === 0) return;
     setIsImporting(true);
     try {
@@ -405,6 +409,10 @@ function HaileApp() {
 
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     if (!accessToken) {
@@ -527,7 +535,7 @@ function HaileApp() {
           </div>
 
           <nav className="space-y-2">
-            {navItems.map((item) => {
+            {navItems.filter((item) => !item.superOnly || isSuperAdmin).map((item) => {
               const Icon = item.icon;
               const active = activePage === item.key;
               return (
@@ -617,6 +625,7 @@ function HaileApp() {
                 onSelect={setSelectedId}
                 onFile={handleImportFile}
                 onImport={runCandidateImport}
+                onExport={exportCandidates}
                 onAi={runAi}
                 form={candidateForm}
                 onFormChange={setCandidateForm}
