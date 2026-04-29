@@ -308,31 +308,47 @@ function HaileApp() {
       return;
     }
 
-    const { error } = await supabase.from("candidates").insert({
-      name: candidateForm.name,
-      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
-      age: candidateForm.age ? Number(candidateForm.age) : null,
-      city: candidateForm.city,
-      stage: candidateForm.stage,
-      license: candidateForm.licenseStatus,
-      notes: candidateForm.note || null,
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני שמירת מועמד.");
+      return;
+    }
+
+    const result = await saveCandidateRow({
+      data: {
+        accessToken,
+        name: candidateForm.name,
+        phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+        age: candidateForm.age ? Number(candidateForm.age) : null,
+        city: candidateForm.city,
+        stage: candidateForm.stage,
+        license: candidateForm.licenseStatus,
+        notes: candidateForm.note || null,
+      },
     });
 
-    if (error) {
-      setActionStatus(`שמירת מועמד נכשלה: ${error.message}`);
+    if (!result.ok) {
+      setActionStatus(`שמירת מועמד נכשלה: ${result.message}`);
       return;
     }
 
     setCandidateForm(emptyCandidateForm());
-    setActionStatus("המועמד נשמר בהצלחה.");
+    setActionStatus(result.message);
     await loadLiveData();
   };
 
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
-    const { error } = await supabase.from("candidates").update({ stage }).eq("id", selected.id);
-    setActionStatus(error ? `עדכון סטטוס נכשל: ${error.message}` : "סטטוס המועמד עודכן.");
-    if (!error) await loadLiveData();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני עדכון סטטוס.");
+      return;
+    }
+    const result = await updateStage({ data: { accessToken, id: selected.id, stage } });
+    setActionStatus(result.ok ? result.message : `עדכון סטטוס נכשל: ${result.message}`);
+    if (result.ok) await loadLiveData();
   };
 
   const exportCandidates = () => {
