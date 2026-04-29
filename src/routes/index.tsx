@@ -251,8 +251,8 @@ function HaileApp() {
 
   const activeCandidates = candidates.filter((candidate) => candidate.stage !== "Placed").length;
   const placedCandidates = candidates.filter((candidate) => candidate.stage === "Placed").length;
-  const canEdit = authUser.role === "super_admin" || authUser.role === "operator";
-  const isSuperAdmin = authUser.role === "super_admin";
+  const canEdit = authUser?.role === "super_admin" || authUser?.role === "operator";
+  const isSuperAdmin = authUser?.role === "super_admin";
   const avgScore = average(
     candidates
       .map((candidate) => candidate.score)
@@ -1581,6 +1581,7 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     id: row.id,
     name: fullName,
     phone: row.phone,
+    age: row.age,
     city: String(row.city),
     language: languageLabel(row.preferred_language),
     licenseStatus: row.license_status,
