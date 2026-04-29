@@ -1246,9 +1246,11 @@ function SettingsPage({ onExport }: { onExport: () => void }) {
 }
 
 function AdminUsersPage({
+  users,
   onInvite,
   status,
 }: {
+  users: SystemUser[];
   onInvite: (email: string, password: string, role: "operator" | "viewer") => void;
   status: string;
 }) {
@@ -1258,7 +1260,18 @@ function AdminUsersPage({
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
       <Panel title="משתמשים פעילים">
-        <EmptyState text="אין משתמשים פעילים להצגה עד שיוגדר מנהל ראשון." />
+        {users.length === 0 ? (
+          <EmptyState text="אין משתמשים פעילים להצגה." />
+        ) : (
+          <div className="space-y-2">
+            {users.map((user) => (
+              <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3">
+                <span className="font-bold">{user.email}</span>
+                <StatusBadge text={roleLabel(user.role as AppRole)} />
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
