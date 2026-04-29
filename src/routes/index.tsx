@@ -1759,14 +1759,22 @@ function ActivityList({ logs }: { logs: LogRow[] }) {
   );
 }
 
-function ConnectionRow({ icon: Icon, label }: { icon: typeof CalendarClock; label: string }) {
+function ConnectionRow({
+  icon: Icon,
+  label,
+  connected = false,
+}: {
+  icon: typeof CalendarClock;
+  label: string;
+  connected?: boolean;
+}) {
   return (
     <div className="mb-3 flex min-h-14 items-center justify-between rounded-md border border-border bg-surface p-3">
       <span className="flex items-center gap-2 font-bold">
         <Icon className="h-4 w-4 text-primary" /> {label}
       </span>
-      <Button variant="tactical" size="sm">
-        התחבר
+      <Button variant={connected ? "command" : "tactical"} size="sm" disabled={connected}>
+        {connected ? "מחובר" : "התחבר"}
       </Button>
     </div>
   );
