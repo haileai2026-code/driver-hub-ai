@@ -55,6 +55,7 @@ import {
 } from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
+import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
 
 export const Route = createFileRoute("/")({
@@ -168,11 +169,14 @@ function HaileApp() {
   const [isImporting, setIsImporting] = useState(false);
   const [aiText, setAiText] = useState("בחר מועמד כדי להפעיל תרגום או ניסוח הודעה.");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [gmailReminder, setGmailReminder] = useState("לחץ Generate WhatsApp Reminder כדי ליצור תזכורת באמהרית מהודעת Gmail אחרונה.");
+  const [isReminderLoading, setIsReminderLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
   const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
+  const generateReminder = useServerFn(generateGmailWhatsAppReminder);
   const applyAgentOperation = useServerFn(applyHaileAiOperation);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
@@ -375,6 +379,31 @@ function HaileApp() {
     if (result.ok) {
       await loadLiveData();
       setAiText(`הסוכן מחובר לנתוני המועמד. סטטוס עודכן ל־${stageLabels[nextStage]}.`);
+    }
+  };
+
+  const runGmailReminder = async () => {
+    setIsReminderLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setGmailReminder("יש להתחבר עם משתמש מורשה כדי לקרוא Gmail.");
+        return;
+      }
+
+      const result = await generateReminder({
+        data: {
+          accessToken,
+          candidateName: selected?.name,
+          candidatePhone: selected?.phone,
+        },
+      });
+
+      setGmailReminder(result.ok ? result.reminder : result.message);
+      setActionStatus(result.message);
+    } finally {
+      setIsReminderLoading(false);
     }
   };
 
@@ -699,7 +728,14 @@ function HaileApp() {
               />
             )}
             {activePage === "reports" && <ReportsPage />}
-            {activePage === "sol" && <SolPage />}
+            {activePage === "sol" && (
+              <SolPage
+                selected={selected}
+                reminder={gmailReminder}
+                isLoading={isReminderLoading}
+                onGenerateReminder={runGmailReminder}
+              />
+            )}
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
