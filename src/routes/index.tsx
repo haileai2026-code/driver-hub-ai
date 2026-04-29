@@ -36,6 +36,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { createCandidate, getAuthorizedSession, getLiveAppData, updateCandidateStage } from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
@@ -154,6 +155,10 @@ function HaileApp() {
   const generateText = useServerFn(generateHaileAiText);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
+  const getSessionRole = useServerFn(getAuthorizedSession);
+  const loadAppData = useServerFn(getLiveAppData);
+  const saveCandidateRow = useServerFn(createCandidate);
+  const updateStage = useServerFn(updateCandidateStage);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
@@ -168,16 +173,20 @@ function HaileApp() {
   }, [authUser?.id]);
 
   const refreshAuth = async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (!session) {
       setAuthUser(null);
       setAuthChecked(true);
       return;
     }
 
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-    const role = pickRole((roles ?? []).map((item) => item.role));
-    setAuthUser({ id: data.user.id, email: data.user.email ?? "", role });
+    const authorized = await getSessionRole({ data: { accessToken: session.access_token } });
+    setAuthUser({
+      id: session.user.id,
+      email: session.user.email ?? authorized.email ?? "",
+      role: authorized.ok ? authorized.role : null,
+    });
     setAuthChecked(true);
   };
 
@@ -185,22 +194,20 @@ function HaileApp() {
     setIsLoadingData(true);
     setLoadError(null);
 
-    const [candidateResult, logResult] = await Promise.all([
-      supabase.from("candidates").select("*").order("created_at", { ascending: false }),
-      supabase
-        .from("operation_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(8),
-    ]);
-
-    if (candidateResult.error || logResult.error) {
-      setLoadError("כדי להציג נתונים אמיתיים צריך להתחבר עם משתמש מורשה.");
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setLoadError("יש להתחבר עם משתמש מורשה כדי להציג נתונים אמיתיים.");
+      setIsLoadingData(false);
+      return;
     }
 
-    const normalized = (candidateResult.data ?? []).map(normalizeCandidate);
+    const result = await loadAppData({ data: { accessToken } });
+    if (!result.ok) setLoadError(result.message);
+
+    const normalized = (result.candidates ?? []).map(normalizeCandidate);
     setCandidates(normalized);
-    setLogs(logResult.data ?? []);
+    setLogs(result.logs ?? []);
     setSelectedId((current) => current ?? normalized[0]?.id ?? null);
     setIsLoadingData(false);
   };
