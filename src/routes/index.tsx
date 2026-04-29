@@ -1047,10 +1047,12 @@ function QuickCandidateForm({
   form,
   onChange,
   onSave,
+  isEditing,
 }: {
   form: CandidateForm;
   onChange: (form: CandidateForm) => void;
   onSave: () => void;
+  isEditing: boolean;
 }) {
   return (
     <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
@@ -1107,7 +1109,7 @@ function QuickCandidateForm({
         </label>
       </div>
       <Button variant="command" onClick={onSave}>
-        <Save className="h-4 w-4" /> שמור מועמד
+        <Save className="h-4 w-4" /> {isEditing ? "עדכן מועמד" : "שמור מועמד"}
       </Button>
     </div>
   );
@@ -1347,15 +1349,21 @@ function CandidateCard({
 function CandidateProfile({
   candidate,
   onAi,
+  onEdit,
+  onDelete,
   onStageChange,
   aiText,
   isAiLoading,
+  canEdit,
 }: {
   candidate: Candidate;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onEdit: () => void;
+  onDelete: () => void;
   onStageChange: (stage: CandidateForm["stage"]) => void;
   aiText: string;
   isAiLoading: boolean;
+  canEdit: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -1381,11 +1389,22 @@ function CandidateProfile({
         {isAiLoading ? "AI מנתח..." : aiText}
       </div>
       <div className="flex flex-wrap gap-2">
-        {(["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
-          <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
-            {stageLabels[stage]}
-          </Button>
-        ))}
+        {canEdit &&
+          (["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
+            <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
+              {stageLabels[stage]}
+            </Button>
+          ))}
+        {canEdit && (
+          <>
+            <Button variant="tactical" onClick={onEdit}>
+              <Pencil className="h-4 w-4" /> ערוך
+            </Button>
+            <Button variant="destructive" onClick={onDelete}>
+              <Trash2 className="h-4 w-4" /> מחק
+            </Button>
+          </>
+        )}
         <Button variant="command" onClick={() => onAi("candidate_next_step")}>
           <Bot className="h-4 w-4" /> הצע צעד הבא
         </Button>
