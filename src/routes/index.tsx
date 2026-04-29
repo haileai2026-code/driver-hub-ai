@@ -184,7 +184,7 @@ function HaileApp() {
     const authorized = await getSessionRole({ data: { accessToken: session.access_token } });
     setAuthUser({
       id: session.user.id,
-      email: session.user.email ?? authorized.email ?? "",
+      email: session.user.email ?? (authorized.ok ? authorized.email : ""),
       role: authorized.ok ? authorized.role : null,
     });
     setAuthChecked(true);
@@ -1482,7 +1482,7 @@ function GradeBadge({ grade }: { grade: Candidate["grade"] }) {
 }
 
 function normalizeCandidate(row: CandidateRow): Candidate {
-  const fullName = normalizeName(row.full_name, row.phone);
+  const fullName = row.name || normalizeName(row.full_name, row.phone);
   const profile = normalizeProfile(row.localized_profile);
   const documentsReady = normalizeDocuments(row.documents);
   const score = typeof profile.score === "number" ? profile.score : null;
@@ -1551,13 +1551,6 @@ function gradeFromScore(score: number | null): Candidate["grade"] {
   if (score >= 8) return "A";
   if (score >= 5) return "B";
   return "C";
-}
-
-function pickRole(roles: string[]): AppRole | null {
-  if (roles.includes("super_admin")) return "super_admin";
-  if (roles.includes("operator")) return "operator";
-  if (roles.includes("viewer")) return "viewer";
-  return null;
 }
 
 function roleLabel(role: AppRole | null) {
