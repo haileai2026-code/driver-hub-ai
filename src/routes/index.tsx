@@ -344,6 +344,16 @@ function HaileApp() {
   };
 
   const handleInvite = async (email: string, password: string, role: "operator" | "viewer") => {
+    if (!email.trim() || !password.trim()) {
+      setActionStatus("יש למלא מייל וסיסמה זמנית.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setActionStatus("סיסמה זמנית חייבת להכיל לפחות 8 תווים.");
+      return;
+    }
+
     const { data } = await supabase.auth.getSession();
     const accessToken = data.session?.access_token;
     if (!accessToken) {
@@ -361,6 +371,16 @@ function HaileApp() {
   };
 
   const handleFirstAdmin = async (email: string, password: string, fullName: string) => {
+    if (!email.trim() || !password.trim() || !fullName.trim()) {
+      setAuthStatus("יש למלא שם, אימייל וסיסמה.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setAuthStatus("סיסמה חייבת להכיל לפחות 8 תווים.");
+      return;
+    }
+
     setAuthStatus("יוצר מנהל ראשי...");
     const result = await createAdmin({ data: { email, password, fullName } });
     setAuthStatus(result.message);
