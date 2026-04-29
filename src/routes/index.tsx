@@ -1244,15 +1244,39 @@ function QuickCandidateForm({
   );
 }
 
-function SolPage() {
+function SolPage({
+  selected,
+  reminder,
+  isLoading,
+  onGenerateReminder,
+}: {
+  selected: Candidate | null;
+  reminder: string;
+  isLoading: boolean;
+  onGenerateReminder: () => void;
+}) {
   return (
     <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
       <Panel title="חיבורים">
-        <ConnectionRow icon={CalendarClock} label="Google Calendar" />
-        <ConnectionRow icon={Mail} label="Gmail" />
+        <ConnectionRow icon={CalendarClock} label="Google Calendar" connected />
+        <ConnectionRow icon={Mail} label="Gmail" connected />
       </Panel>
       <Panel title="שיחה עם SOL">
-        <EmptyState text="ממשק הצ׳אט יופעל לאחר חיבור יומן ומיילים." />
+        <div className="space-y-3">
+          <SettingsGrid
+            items={[
+              `מועמד פעיל: ${selected?.name ?? "לא נבחר"}`,
+              "מקור: Gmail Inbox",
+              "שפה: אמהרית ל־WhatsApp",
+            ]}
+          />
+          <Button variant="command" onClick={onGenerateReminder} disabled={isLoading}>
+            <Mail className="h-4 w-4" /> {isLoading ? "מייצר תזכורת..." : "Generate WhatsApp Reminder"}
+          </Button>
+          <div className="rounded-md border border-border bg-background/60 p-4 text-sm leading-7 text-foreground">
+            {reminder}
+          </div>
+        </div>
       </Panel>
       <Panel title="סיכום בוקר">
         <SettingsGrid
