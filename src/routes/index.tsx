@@ -1540,16 +1540,23 @@ function ImportControls({
   isImporting,
   onFile,
   onImport,
+  onExport,
+  canEdit,
 }: {
   importRows: number;
   importStatus: string;
   isImporting: boolean;
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
+  onExport: () => void;
+  canEdit: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <Button variant="tactical" asChild>
+      <Button variant="tactical" onClick={onExport}>
+        <Download className="h-4 w-4" /> ייצוא CSV
+      </Button>
+      <Button variant="tactical" asChild disabled={!canEdit}>
         <label className="min-h-11 cursor-pointer">
           <UploadCloud className="h-4 w-4" /> בחר CSV / Excel
           <input type="file" accept=".csv,.xlsx,.xls" className="sr-only" onChange={onFile} />
@@ -1558,7 +1565,7 @@ function ImportControls({
       <Button
         variant="command"
         onClick={onImport}
-        disabled={!importRows || isImporting}
+        disabled={!canEdit || !importRows || isImporting}
         title={importStatus}
       >
         {isImporting ? "מייבא..." : `ייבא (${importRows})`}
