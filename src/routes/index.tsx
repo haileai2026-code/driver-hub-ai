@@ -911,10 +911,14 @@ function CandidatesPage({
   form,
   onFormChange,
   onSaveCandidate,
+  onEditCandidate,
+  onDeleteCandidate,
   onStageChange,
   actionStatus,
   aiText,
   isAiLoading,
+  canEdit,
+  isEditing,
 }: {
   candidates: Candidate[];
   selected: Candidate | null;
@@ -932,10 +936,14 @@ function CandidatesPage({
   form: CandidateForm;
   onFormChange: (form: CandidateForm) => void;
   onSaveCandidate: () => void;
+  onEditCandidate: (candidate: Candidate) => void;
+  onDeleteCandidate: () => void;
   onStageChange: (stage: CandidateForm["stage"]) => void;
   actionStatus: string;
   aiText: string;
   isAiLoading: boolean;
+  canEdit: boolean;
+  isEditing: boolean;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -988,17 +996,20 @@ function CandidatesPage({
       </Panel>
 
       <Panel title="פרופיל מועמד + CIEL">
-        <Notice tone="success" text={actionStatus} />
-        <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} />
+        <Notice tone={canEdit ? "success" : "warning"} text={canEdit ? actionStatus : "מצב צפייה בלבד — אין הרשאת עריכה למשתמש הזה."} />
+        {canEdit && <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} isEditing={isEditing} />}
         {!selected ? (
           <EmptyState text="בחר מועמד כדי לפתוח פרופיל." />
         ) : (
           <CandidateProfile
             candidate={selected}
             onAi={onAi}
+            onEdit={() => onEditCandidate(selected)}
+            onDelete={onDeleteCandidate}
             onStageChange={onStageChange}
             aiText={aiText}
             isAiLoading={isAiLoading}
+            canEdit={canEdit}
           />
         )}
       </Panel>
