@@ -302,18 +302,13 @@ function HaileApp() {
     }
 
     const { error } = await supabase.from("candidates").insert({
-      full_name: { he: candidateForm.name, am: candidateForm.name, ru: candidateForm.name },
+      name: candidateForm.name,
       phone: candidateForm.phone.replace(/[^+\d]/g, ""),
       age: candidateForm.age ? Number(candidateForm.age) : null,
       city: candidateForm.city,
-      preferred_language: candidateForm.language,
       stage: candidateForm.stage,
-      license_status: candidateForm.licenseStatus,
-      documents: {
-        id: { received: candidateForm.idDocument, url: null },
-        green_form: { received: candidateForm.greenForm, url: null },
-      },
-      localized_profile: { he: { note: candidateForm.note }, am: {}, ru: {} },
+      license: candidateForm.licenseStatus,
+      notes: candidateForm.note || null,
     });
 
     if (error) {
