@@ -621,10 +621,14 @@ function HaileApp() {
                 form={candidateForm}
                 onFormChange={setCandidateForm}
                 onSaveCandidate={saveCandidate}
+                onEditCandidate={startEditCandidate}
+                onDeleteCandidate={deleteSelectedCandidate}
                 onStageChange={updateSelectedStage}
                 actionStatus={actionStatus}
                 aiText={aiText}
                 isAiLoading={isAiLoading}
+                canEdit={canEdit}
+                isEditing={Boolean(editingId)}
               />
             )}
             {activePage === "agents" && <AgentsPage />}
@@ -633,8 +637,8 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
-            {activePage === "admin" && (
-              <AdminUsersPage onInvite={handleInvite} status={actionStatus} />
+            {activePage === "admin" && isSuperAdmin && (
+              <AdminUsersPage users={systemUsers} onInvite={handleInvite} status={actionStatus} />
             )}
           </div>
         </section>
