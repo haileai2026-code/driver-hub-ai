@@ -624,11 +624,13 @@ function Field({
   value,
   onChange,
   type = "text",
+  minLength,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  minLength?: number;
 }) {
   return (
     <label className="mb-3 block text-sm font-bold">
@@ -636,6 +638,7 @@ function Field({
       <input
         required
         type={type}
+        minLength={minLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-primary"
