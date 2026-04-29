@@ -17,6 +17,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronLeft,
+  Database,
   Download,
   FileText,
   Gauge,
@@ -1260,6 +1261,8 @@ function SolPage({
       <Panel title="חיבורים">
         <ConnectionRow icon={CalendarClock} label="Google Calendar" connected />
         <ConnectionRow icon={Mail} label="Gmail" connected />
+        <ConnectionRow icon={FileText} label="Google Docs" connected connectionId="std_01kqa4eyvefkb8f7b4ffadqyn0" />
+        <ConnectionRow icon={Database} label="Google Sheets" connected connectionId="std_01kqa4gs49fm7t66jzne5zkg2x" />
       </Panel>
       <Panel title="שיחה עם SOL">
         <div className="space-y-3">
@@ -1376,6 +1379,8 @@ function SettingsPage({ onExport }: { onExport: () => void }) {
             "Twilio SMS/Voice",
             "Google Calendar OAuth",
             "Gmail OAuth",
+            "Google Docs OAuth: מחובר",
+            "Google Sheets OAuth: מחובר",
             "Claude API Key",
           ]}
         />
@@ -1763,10 +1768,12 @@ function ConnectionRow({
   icon: Icon,
   label,
   connected = false,
+  connectionId,
 }: {
   icon: typeof CalendarClock;
   label: string;
   connected?: boolean;
+  connectionId?: string;
 }) {
   return (
     <div className="mb-3 flex min-h-14 items-center justify-between rounded-md border border-border bg-surface p-3">
@@ -1776,6 +1783,7 @@ function ConnectionRow({
       <Button variant={connected ? "command" : "tactical"} size="sm" disabled={connected}>
         {connected ? "מחובר" : "התחבר"}
       </Button>
+      {connectionId && <span className="sr-only">Connection ID: {connectionId}</span>}
     </div>
   );
 }
