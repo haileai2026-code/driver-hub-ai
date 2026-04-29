@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, TablesInsert } from "@/integrations/supabase/types";
 
 type CandidateInsert = TablesInsert<"candidates">;
@@ -35,21 +35,18 @@ const headerMap = {
 export const importCandidatesFromRows = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ImportSchema.parse(input))
   .handler(async ({ data }) => {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-
-    if (!supabaseUrl || !publishableKey) {
-      return { inserted: 0, skipped: data.rows.length, errors: ["Backend is not configured."] };
-    }
-
-    const supabase = createClient<Database>(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: `Bearer ${data.accessToken}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: userData, error: authError } = await supabase.auth.getUser(data.accessToken);
+    const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authError || !userData.user) {
       return { inserted: 0, skipped: data.rows.length, errors: ["יש להתחבר לפני ייבוא מועמדים."] };
+    }
+
+    const { data: roleRow } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    if (!roleRow || !["super_admin", "operator"].includes(roleRow.role)) {
+      return { inserted: 0, skipped: data.rows.length, errors: ["אין הרשאת עריכה לייבוא מועמדים."] };
     }
 
     const errors: string[] = [];
@@ -70,11 +67,16 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       return [mapped as CandidateInsert];
     });
 
+    candidates.forEach((candidate) => {
+      candidate.created_by = userData.user.id;
+      candidate.license_status = normalizeLicense(String(candidate.license ?? ""));
+    });
+
     if (candidates.length === 0) {
       return { inserted: 0, skipped: data.rows.length, errors };
     }
 
-    const { data: insertedRows, error } = await supabase.from("candidates").insert(candidates).select("id");
+    const { data: insertedRows, error } = await supabaseAdmin.from("candidates").insert(candidates).select("id");
     if (error) {
       return { inserted: 0, skipped: data.rows.length, errors: [error.message, ...errors] };
     }

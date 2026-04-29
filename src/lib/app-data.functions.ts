@@ -13,13 +13,21 @@ const CandidateSchema = AccessTokenSchema.extend({
   age: z.number().int().min(16).max(90).nullable(),
   city: z.enum(["Ashkelon", "Kiryat Gat"]),
   stage: z.enum(["Lead", "Learning", "Test", "Placed"]),
-  license: z.string().trim().max(120).nullable(),
+  license: z.enum(["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"]),
   notes: z.string().trim().max(2000).nullable(),
+});
+
+const CandidateUpdateSchema = CandidateSchema.extend({
+  id: z.string().uuid(),
 });
 
 const UpdateStageSchema = AccessTokenSchema.extend({
   id: z.string().uuid(),
   stage: z.enum(["Lead", "Learning", "Test", "Placed"]),
+});
+
+const CandidateIdSchema = AccessTokenSchema.extend({
+  id: z.string().uuid(),
 });
 
 type AppRole = "super_admin" | "operator" | "viewer";
@@ -53,31 +61,49 @@ export const getLiveAppData = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
   .handler(async ({ data }) => {
     const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator", "viewer"]);
-    if (!auth.ok) return { ok: false as const, message: auth.message, candidates: [], logs: [] };
+    if (!auth.ok) return { ok: false as const, message: auth.message, candidates: [], logs: [], users: [] };
 
-    const [candidateResult, logResult] = await Promise.all([
+    const [candidateResult, logResult, roleResult] = await Promise.all([
       supabaseAdmin.from("candidates").select("*").order("created_at", { ascending: false }),
       supabaseAdmin
         .from("operation_logs")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(8),
+      auth.role === "super_admin"
+        ? supabaseAdmin.from("user_roles").select("id,user_id,role,created_at").order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (candidateResult.error || logResult.error) {
+    if (candidateResult.error || logResult.error || roleResult.error) {
       return {
         ok: false as const,
         message:
-          candidateResult.error?.message ?? logResult.error?.message ?? "טעינת הנתונים נכשלה.",
+          candidateResult.error?.message ?? logResult.error?.message ?? roleResult.error?.message ?? "טעינת הנתונים נכשלה.",
         candidates: [],
         logs: [],
+        users: [],
       };
     }
+
+    const roleRows = roleResult.data ?? [];
+    const users = auth.role === "super_admin" && roleRows.length
+      ? (await supabaseAdmin.auth.admin.listUsers()).data.users.map((user) => {
+          const roleRow = roleRows.find((row) => row.user_id === user.id);
+          return {
+            id: user.id,
+            email: user.email ?? "",
+            role: roleRow?.role ?? "viewer",
+            created_at: roleRow?.created_at ?? user.created_at,
+          };
+        }).filter((user) => roleRows.some((row) => row.user_id === user.id))
+      : [];
 
     return {
       ok: true as const,
       candidates: candidateResult.data ?? [],
       logs: logResult.data ?? [],
+      users,
     };
   });
 
@@ -94,6 +120,7 @@ export const createCandidate = createServerFn({ method: "POST" })
       city: data.city,
       stage: data.stage,
       license: data.license,
+      license_status: data.license,
       notes: data.notes,
       created_by: auth.userId,
     });
@@ -101,6 +128,32 @@ export const createCandidate = createServerFn({ method: "POST" })
     return error
       ? { ok: false as const, message: error.message }
       : { ok: true as const, message: "המועמד נשמר בהצלחה." };
+  });
+
+export const updateCandidate = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => CandidateUpdateSchema.parse(input))
+  .handler(async ({ data }) => {
+    const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
+    if (!auth.ok) return { ok: false as const, message: auth.message };
+
+    const { error } = await supabaseAdmin
+      .from("candidates")
+      .update({
+        name: data.name,
+        phone: data.phone,
+        age: data.age,
+        city: data.city,
+        stage: data.stage,
+        license: data.license,
+        license_status: data.license,
+        notes: data.notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.id);
+
+    return error
+      ? { ok: false as const, message: error.message }
+      : { ok: true as const, message: "פרטי המועמד עודכנו." };
   });
 
 export const updateCandidateStage = createServerFn({ method: "POST" })
@@ -116,4 +169,16 @@ export const updateCandidateStage = createServerFn({ method: "POST" })
     return error
       ? { ok: false as const, message: error.message }
       : { ok: true as const, message: "סטטוס המועמד עודכן." };
+  });
+
+export const deleteCandidate = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => CandidateIdSchema.parse(input))
+  .handler(async ({ data }) => {
+    const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
+    if (!auth.ok) return { ok: false as const, message: auth.message };
+
+    const { error } = await supabaseAdmin.from("candidates").delete().eq("id", data.id);
+    return error
+      ? { ok: false as const, message: error.message }
+      : { ok: true as const, message: "המועמד נמחק." };
   });

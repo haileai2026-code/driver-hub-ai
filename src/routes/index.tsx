@@ -27,12 +27,14 @@ import {
   Mail,
   Menu,
   Mic,
+  Pencil,
   Phone,
   Search,
   Save,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   UploadCloud,
   UserPlus,
   UsersRound,
@@ -45,8 +47,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import {
   createCandidate,
+  deleteCandidate,
   getAuthorizedSession,
   getLiveAppData,
+  updateCandidate,
   updateCandidateStage,
 } from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
@@ -87,6 +91,7 @@ type Candidate = {
   id: string;
   name: string;
   phone: string;
+  age: number | null;
   city: string;
   language: string;
   licenseStatus: string;
@@ -99,6 +104,7 @@ type Candidate = {
 };
 type AppRole = "super_admin" | "operator" | "viewer";
 type AuthUser = { id: string; email: string; role: AppRole | null };
+type SystemUser = { id: string; email: string; role: string; created_at: string };
 type CandidateForm = {
   name: string;
   phone: string;
@@ -147,6 +153,7 @@ function HaileApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -163,6 +170,7 @@ function HaileApp() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
   const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
+  const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
   const createAdmin = useServerFn(createFirstSuperAdmin);
@@ -170,7 +178,9 @@ function HaileApp() {
   const getSessionRole = useServerFn(getAuthorizedSession);
   const loadAppData = useServerFn(getLiveAppData);
   const saveCandidateRow = useServerFn(createCandidate);
+  const editCandidateRow = useServerFn(updateCandidate);
   const updateStage = useServerFn(updateCandidateStage);
+  const removeCandidateRow = useServerFn(deleteCandidate);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
@@ -220,6 +230,7 @@ function HaileApp() {
     const normalized = (result.candidates ?? []).map(normalizeCandidate);
     setCandidates(normalized);
     setLogs(result.logs ?? []);
+    setSystemUsers(result.users ?? []);
     setSelectedId((current) => current ?? normalized[0]?.id ?? null);
     setIsLoadingData(false);
   };
@@ -241,6 +252,8 @@ function HaileApp() {
 
   const activeCandidates = candidates.filter((candidate) => candidate.stage !== "Placed").length;
   const placedCandidates = candidates.filter((candidate) => candidate.stage === "Placed").length;
+  const canEdit = authUser?.role === "super_admin" || authUser?.role === "operator";
+  const isSuperAdmin = authUser?.role === "super_admin";
   const avgScore = average(
     candidates
       .map((candidate) => candidate.score)
@@ -270,6 +283,10 @@ function HaileApp() {
   };
 
   const runCandidateImport = async () => {
+    if (!canEdit) {
+      setImportStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
     if (importRows.length === 0) return;
     setIsImporting(true);
     try {
@@ -315,6 +332,11 @@ function HaileApp() {
   };
 
   const saveCandidate = async () => {
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+
     if (!candidateForm.name.trim() || !candidateForm.phone.trim()) {
       setActionStatus("שם וטלפון הם שדות חובה.");
       return;
@@ -327,18 +349,19 @@ function HaileApp() {
       return;
     }
 
-    const result = await saveCandidateRow({
-      data: {
-        accessToken,
-        name: candidateForm.name,
-        phone: candidateForm.phone.replace(/[^+\d]/g, ""),
-        age: candidateForm.age ? Number(candidateForm.age) : null,
-        city: candidateForm.city,
-        stage: candidateForm.stage,
-        license: candidateForm.licenseStatus,
-        notes: candidateForm.note || null,
-      },
-    });
+    const payload = {
+      accessToken,
+      name: candidateForm.name,
+      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+      age: candidateForm.age ? Number(candidateForm.age) : null,
+      city: candidateForm.city,
+      stage: candidateForm.stage,
+      license: candidateForm.licenseStatus,
+      notes: candidateForm.note || null,
+    };
+    const result = editingId
+      ? await editCandidateRow({ data: { ...payload, id: editingId } })
+      : await saveCandidateRow({ data: payload });
 
     if (!result.ok) {
       setActionStatus(`שמירת מועמד נכשלה: ${result.message}`);
@@ -346,12 +369,50 @@ function HaileApp() {
     }
 
     setCandidateForm(emptyCandidateForm());
+    setEditingId(null);
     setActionStatus(result.message);
     await loadLiveData();
   };
 
+  const startEditCandidate = (candidate: Candidate) => {
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+    setSelectedId(candidate.id);
+    setEditingId(candidate.id);
+    setCandidateForm(candidateToForm(candidate));
+    setActionStatus("מצב עריכה פעיל — שמירה תעדכן את המועמד הנבחר.");
+  };
+
+  const deleteSelectedCandidate = async () => {
+    if (!selected) return;
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני מחיקה.");
+      return;
+    }
+    const result = await removeCandidateRow({ data: { accessToken, id: selected.id } });
+    setActionStatus(result.ok ? result.message : `מחיקה נכשלה: ${result.message}`);
+    if (result.ok) {
+      setSelectedId(null);
+      setEditingId(null);
+      setCandidateForm(emptyCandidateForm());
+      await loadLiveData();
+    }
+  };
+
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     if (!accessToken) {
@@ -397,6 +458,7 @@ function HaileApp() {
     }
     const result = await inviteUser({ data: { accessToken, email, password, role } });
     setActionStatus(result.message);
+    if (result.ok) await loadLiveData();
   };
 
   const handleLogin = async (email: string, password: string) => {
@@ -474,7 +536,7 @@ function HaileApp() {
           </div>
 
           <nav className="space-y-2">
-            {navItems.map((item) => {
+            {navItems.filter((item) => !item.superOnly || isSuperAdmin).map((item) => {
               const Icon = item.icon;
               const active = activePage === item.key;
               return (
@@ -564,14 +626,19 @@ function HaileApp() {
                 onSelect={setSelectedId}
                 onFile={handleImportFile}
                 onImport={runCandidateImport}
+                onExport={exportCandidates}
                 onAi={runAi}
                 form={candidateForm}
                 onFormChange={setCandidateForm}
                 onSaveCandidate={saveCandidate}
+                onEditCandidate={startEditCandidate}
+                onDeleteCandidate={deleteSelectedCandidate}
                 onStageChange={updateSelectedStage}
                 actionStatus={actionStatus}
                 aiText={aiText}
                 isAiLoading={isAiLoading}
+                canEdit={canEdit}
+                isEditing={Boolean(editingId)}
               />
             )}
             {activePage === "agents" && <AgentsPage />}
@@ -580,8 +647,8 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
-            {activePage === "admin" && (
-              <AdminUsersPage onInvite={handleInvite} status={actionStatus} />
+            {activePage === "admin" && isSuperAdmin && (
+              <AdminUsersPage users={systemUsers} onInvite={handleInvite} status={actionStatus} />
             )}
           </div>
         </section>
@@ -850,14 +917,19 @@ function CandidatesPage({
   onSelect,
   onFile,
   onImport,
+  onExport,
   onAi,
   form,
   onFormChange,
   onSaveCandidate,
+  onEditCandidate,
+  onDeleteCandidate,
   onStageChange,
   actionStatus,
   aiText,
   isAiLoading,
+  canEdit,
+  isEditing,
 }: {
   candidates: Candidate[];
   selected: Candidate | null;
@@ -871,14 +943,19 @@ function CandidatesPage({
   onSelect: (id: string) => void;
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
+  onExport: () => void;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
   form: CandidateForm;
   onFormChange: (form: CandidateForm) => void;
   onSaveCandidate: () => void;
+  onEditCandidate: (candidate: Candidate) => void;
+  onDeleteCandidate: () => void;
   onStageChange: (stage: CandidateForm["stage"]) => void;
   actionStatus: string;
   aiText: string;
   isAiLoading: boolean;
+  canEdit: boolean;
+  isEditing: boolean;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -891,6 +968,8 @@ function CandidatesPage({
             isImporting={isImporting}
             onFile={onFile}
             onImport={onImport}
+            onExport={onExport}
+            canEdit={canEdit}
           />
         }
       >
@@ -931,17 +1010,20 @@ function CandidatesPage({
       </Panel>
 
       <Panel title="פרופיל מועמד + CIEL">
-        <Notice tone="success" text={actionStatus} />
-        <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} />
+        <Notice tone={canEdit ? "success" : "warning"} text={canEdit ? actionStatus : "מצב צפייה בלבד — אין הרשאת עריכה למשתמש הזה."} />
+        {canEdit && <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} isEditing={isEditing} />}
         {!selected ? (
           <EmptyState text="בחר מועמד כדי לפתוח פרופיל." />
         ) : (
           <CandidateProfile
             candidate={selected}
             onAi={onAi}
+            onEdit={() => onEditCandidate(selected)}
+            onDelete={onDeleteCandidate}
             onStageChange={onStageChange}
             aiText={aiText}
             isAiLoading={isAiLoading}
+            canEdit={canEdit}
           />
         )}
       </Panel>
@@ -979,10 +1061,12 @@ function QuickCandidateForm({
   form,
   onChange,
   onSave,
+  isEditing,
 }: {
   form: CandidateForm;
   onChange: (form: CandidateForm) => void;
   onSave: () => void;
+  isEditing: boolean;
 }) {
   return (
     <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
@@ -1039,7 +1123,7 @@ function QuickCandidateForm({
         </label>
       </div>
       <Button variant="command" onClick={onSave}>
-        <Save className="h-4 w-4" /> שמור מועמד
+        <Save className="h-4 w-4" /> {isEditing ? "עדכן מועמד" : "שמור מועמד"}
       </Button>
     </div>
   );
@@ -1176,9 +1260,11 @@ function SettingsPage({ onExport }: { onExport: () => void }) {
 }
 
 function AdminUsersPage({
+  users,
   onInvite,
   status,
 }: {
+  users: SystemUser[];
   onInvite: (email: string, password: string, role: "operator" | "viewer") => void;
   status: string;
 }) {
@@ -1188,7 +1274,18 @@ function AdminUsersPage({
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
       <Panel title="משתמשים פעילים">
-        <EmptyState text="אין משתמשים פעילים להצגה עד שיוגדר מנהל ראשון." />
+        {users.length === 0 ? (
+          <EmptyState text="אין משתמשים פעילים להצגה." />
+        ) : (
+          <div className="space-y-2">
+            {users.map((user) => (
+              <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3">
+                <span className="font-bold">{user.email}</span>
+                <StatusBadge text={roleLabel(user.role as AppRole)} />
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
@@ -1279,15 +1376,21 @@ function CandidateCard({
 function CandidateProfile({
   candidate,
   onAi,
+  onEdit,
+  onDelete,
   onStageChange,
   aiText,
   isAiLoading,
+  canEdit,
 }: {
   candidate: Candidate;
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onEdit: () => void;
+  onDelete: () => void;
   onStageChange: (stage: CandidateForm["stage"]) => void;
   aiText: string;
   isAiLoading: boolean;
+  canEdit: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -1313,11 +1416,22 @@ function CandidateProfile({
         {isAiLoading ? "AI מנתח..." : aiText}
       </div>
       <div className="flex flex-wrap gap-2">
-        {(["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
-          <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
-            {stageLabels[stage]}
-          </Button>
-        ))}
+        {canEdit &&
+          (["Lead", "Learning", "Test", "Placed"] as const).map((stage) => (
+            <Button key={stage} variant="tactical" size="sm" onClick={() => onStageChange(stage)}>
+              {stageLabels[stage]}
+            </Button>
+          ))}
+        {canEdit && (
+          <>
+            <Button variant="tactical" onClick={onEdit}>
+              <Pencil className="h-4 w-4" /> ערוך
+            </Button>
+            <Button variant="destructive" onClick={onDelete}>
+              <Trash2 className="h-4 w-4" /> מחק
+            </Button>
+          </>
+        )}
         <Button variant="command" onClick={() => onAi("candidate_next_step")}>
           <Bot className="h-4 w-4" /> הצע צעד הבא
         </Button>
@@ -1427,16 +1541,23 @@ function ImportControls({
   isImporting,
   onFile,
   onImport,
+  onExport,
+  canEdit,
 }: {
   importRows: number;
   importStatus: string;
   isImporting: boolean;
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onImport: () => void;
+  onExport: () => void;
+  canEdit: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <Button variant="tactical" asChild>
+      <Button variant="tactical" onClick={onExport}>
+        <Download className="h-4 w-4" /> ייצוא CSV
+      </Button>
+      <Button variant="tactical" asChild disabled={!canEdit}>
         <label className="min-h-11 cursor-pointer">
           <UploadCloud className="h-4 w-4" /> בחר CSV / Excel
           <input type="file" accept=".csv,.xlsx,.xls" className="sr-only" onChange={onFile} />
@@ -1445,7 +1566,7 @@ function ImportControls({
       <Button
         variant="command"
         onClick={onImport}
-        disabled={!importRows || isImporting}
+        disabled={!canEdit || !importRows || isImporting}
         title={importStatus}
       >
         {isImporting ? "מייבא..." : `ייבא (${importRows})`}
@@ -1569,6 +1690,7 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     id: row.id,
     name: fullName,
     phone: row.phone,
+    age: row.age,
     city: String(row.city),
     language: languageLabel(row.preferred_language),
     licenseStatus: row.license_status,
@@ -1651,6 +1773,27 @@ function emptyCandidateForm(): CandidateForm {
     note: "",
     idDocument: false,
     greenForm: false,
+  };
+}
+
+function candidateToForm(candidate: Candidate): CandidateForm {
+  return {
+    name: candidate.name,
+    phone: candidate.phone,
+    age: candidate.age ? String(candidate.age) : "",
+    city: candidate.city === "Kiryat Gat" ? "Kiryat Gat" : "Ashkelon",
+    language: candidate.language === "עברית" ? "he" : candidate.language === "רוסית" ? "ru" : "am",
+    stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(candidate.stage as CandidateForm["stage"])
+      ? (candidate.stage as CandidateForm["stage"])
+      : "Lead",
+    licenseStatus: (["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const).includes(
+      candidate.licenseStatus as CandidateForm["licenseStatus"],
+    )
+      ? (candidate.licenseStatus as CandidateForm["licenseStatus"])
+      : "Not Started",
+    note: candidate.note,
+    idDocument: candidate.documentsReady,
+    greenForm: candidate.documentsReady,
   };
 }
 
