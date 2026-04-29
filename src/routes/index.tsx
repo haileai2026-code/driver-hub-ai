@@ -1768,10 +1768,12 @@ function ConnectionRow({
   icon: Icon,
   label,
   connected = false,
+  connectionId,
 }: {
   icon: typeof CalendarClock;
   label: string;
   connected?: boolean;
+  connectionId?: string;
 }) {
   return (
     <div className="mb-3 flex min-h-14 items-center justify-between rounded-md border border-border bg-surface p-3">
@@ -1781,6 +1783,7 @@ function ConnectionRow({
       <Button variant={connected ? "command" : "tactical"} size="sm" disabled={connected}>
         {connected ? "מחובר" : "התחבר"}
       </Button>
+      {connectionId && <span className="sr-only">Connection ID: {connectionId}</span>}
     </div>
   );
 }
