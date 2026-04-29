@@ -592,7 +592,7 @@ function AuthScreen({
           <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
         )}
         <Field label="אימייל" value={email} onChange={setEmail} type="email" />
-        <Field label="סיסמה" value={password} onChange={setPassword} type="password" />
+        <Field label="סיסמה" value={password} onChange={setPassword} type="password" minLength={mode === "firstAdmin" ? 8 : undefined} />
         <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
           <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
         </Button>
@@ -648,15 +648,21 @@ function SmallInput({
   label,
   value,
   onChange,
+  type = "text",
+  minLength,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: string;
+  minLength?: number;
 }) {
   return (
     <label className="block text-xs font-bold text-muted-foreground">
       {label}
       <input
+        type={type}
+        minLength={minLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
