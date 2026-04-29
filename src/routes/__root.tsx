@@ -45,6 +45,12 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Haile AI Recruitment Command" },
+      { name: "description", content: "Driver Hub AI is a recruitment and management system for drivers." },
+      { property: "og:description", content: "Driver Hub AI is a recruitment and management system for drivers." },
+      { name: "twitter:description", content: "Driver Hub AI is a recruitment and management system for drivers." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/tXBYU6U0fUPUrLYTOzYUKg84r8v2/social-images/social-1777500878507-188546.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/tXBYU6U0fUPUrLYTOzYUKg84r8v2/social-images/social-1777500878507-188546.webp" },
     ],
     links: [
       {
