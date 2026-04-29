@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -36,6 +43,12 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import {
+  createCandidate,
+  getAuthorizedSession,
+  getLiveAppData,
+  updateCandidateStage,
+} from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateHaileAiText } from "@/lib/haile-ai.functions";
@@ -154,6 +167,10 @@ function HaileApp() {
   const generateText = useServerFn(generateHaileAiText);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
+  const getSessionRole = useServerFn(getAuthorizedSession);
+  const loadAppData = useServerFn(getLiveAppData);
+  const saveCandidateRow = useServerFn(createCandidate);
+  const updateStage = useServerFn(updateCandidateStage);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
@@ -168,16 +185,20 @@ function HaileApp() {
   }, [authUser?.id]);
 
   const refreshAuth = async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (!session) {
       setAuthUser(null);
       setAuthChecked(true);
       return;
     }
 
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-    const role = pickRole((roles ?? []).map((item) => item.role));
-    setAuthUser({ id: data.user.id, email: data.user.email ?? "", role });
+    const authorized = await getSessionRole({ data: { accessToken: session.access_token } });
+    setAuthUser({
+      id: session.user.id,
+      email: session.user.email ?? (authorized.ok ? authorized.email : ""),
+      role: authorized.ok ? authorized.role : null,
+    });
     setAuthChecked(true);
   };
 
@@ -185,22 +206,20 @@ function HaileApp() {
     setIsLoadingData(true);
     setLoadError(null);
 
-    const [candidateResult, logResult] = await Promise.all([
-      supabase.from("candidates").select("*").order("created_at", { ascending: false }),
-      supabase
-        .from("operation_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(8),
-    ]);
-
-    if (candidateResult.error || logResult.error) {
-      setLoadError("כדי להציג נתונים אמיתיים צריך להתחבר עם משתמש מורשה.");
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setLoadError("יש להתחבר עם משתמש מורשה כדי להציג נתונים אמיתיים.");
+      setIsLoadingData(false);
+      return;
     }
 
-    const normalized = (candidateResult.data ?? []).map(normalizeCandidate);
+    const result = await loadAppData({ data: { accessToken } });
+    if (!result.ok) setLoadError(result.message);
+
+    const normalized = (result.candidates ?? []).map(normalizeCandidate);
     setCandidates(normalized);
-    setLogs(logResult.data ?? []);
+    setLogs(result.logs ?? []);
     setSelectedId((current) => current ?? normalized[0]?.id ?? null);
     setIsLoadingData(false);
   };
@@ -301,31 +320,47 @@ function HaileApp() {
       return;
     }
 
-    const { error } = await supabase.from("candidates").insert({
-      name: candidateForm.name,
-      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
-      age: candidateForm.age ? Number(candidateForm.age) : null,
-      city: candidateForm.city,
-      stage: candidateForm.stage,
-      license: candidateForm.licenseStatus,
-      notes: candidateForm.note || null,
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני שמירת מועמד.");
+      return;
+    }
+
+    const result = await saveCandidateRow({
+      data: {
+        accessToken,
+        name: candidateForm.name,
+        phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+        age: candidateForm.age ? Number(candidateForm.age) : null,
+        city: candidateForm.city,
+        stage: candidateForm.stage,
+        license: candidateForm.licenseStatus,
+        notes: candidateForm.note || null,
+      },
     });
 
-    if (error) {
-      setActionStatus(`שמירת מועמד נכשלה: ${error.message}`);
+    if (!result.ok) {
+      setActionStatus(`שמירת מועמד נכשלה: ${result.message}`);
       return;
     }
 
     setCandidateForm(emptyCandidateForm());
-    setActionStatus("המועמד נשמר בהצלחה.");
+    setActionStatus(result.message);
     await loadLiveData();
   };
 
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
-    const { error } = await supabase.from("candidates").update({ stage }).eq("id", selected.id);
-    setActionStatus(error ? `עדכון סטטוס נכשל: ${error.message}` : "סטטוס המועמד עודכן.");
-    if (!error) await loadLiveData();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני עדכון סטטוס.");
+      return;
+    }
+    const result = await updateStage({ data: { accessToken, id: selected.id, stage } });
+    setActionStatus(result.ok ? result.message : `עדכון סטטוס נכשל: ${result.message}`);
+    if (result.ok) await loadLiveData();
   };
 
   const exportCandidates = () => {
@@ -545,7 +580,9 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
-            {activePage === "admin" && <AdminUsersPage onInvite={handleInvite} status={actionStatus} />}
+            {activePage === "admin" && (
+              <AdminUsersPage onInvite={handleInvite} status={actionStatus} />
+            )}
           </div>
         </section>
       </div>
@@ -577,7 +614,10 @@ function AuthScreen({
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground" dir="rtl">
+    <main
+      className="grid min-h-screen place-items-center bg-background p-4 text-foreground"
+      dir="rtl"
+    >
       <form onSubmit={submit} className="glass-panel w-full max-w-md rounded-lg p-6">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground">
@@ -592,7 +632,13 @@ function AuthScreen({
           <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
         )}
         <Field label="אימייל" value={email} onChange={setEmail} type="email" />
-        <Field label="סיסמה" value={password} onChange={setPassword} type="password" minLength={mode === "firstAdmin" ? 8 : undefined} />
+        <Field
+          label="סיסמה"
+          value={password}
+          onChange={setPassword}
+          type="password"
+          minLength={mode === "firstAdmin" ? 8 : undefined}
+        />
         <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
           <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
         </Button>
@@ -941,19 +987,60 @@ function QuickCandidateForm({
   return (
     <div className="mb-4 grid gap-3 rounded-md border border-border bg-surface p-3">
       <div className="grid gap-2 sm:grid-cols-2">
-        <SmallInput label="שם מלא" value={form.name} onChange={(name) => onChange({ ...form, name })} />
-        <SmallInput label="טלפון" value={form.phone} onChange={(phone) => onChange({ ...form, phone })} />
+        <SmallInput
+          label="שם מלא"
+          value={form.name}
+          onChange={(name) => onChange({ ...form, name })}
+        />
+        <SmallInput
+          label="טלפון"
+          value={form.phone}
+          onChange={(phone) => onChange({ ...form, phone })}
+        />
         <SmallInput label="גיל" value={form.age} onChange={(age) => onChange({ ...form, age })} />
-        <SmallSelect label="עיר" value={form.city} options={["Ashkelon", "Kiryat Gat"]} onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })} />
-        <SmallSelect label="שפה" value={form.language} options={["he", "am", "ru"]} onChange={(language) => onChange({ ...form, language: language as CandidateForm["language"] })} />
-        <SmallSelect label="שלב" value={form.stage} options={["Lead", "Learning", "Test", "Placed"]} onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })} />
+        <SmallSelect
+          label="עיר"
+          value={form.city}
+          options={["Ashkelon", "Kiryat Gat"]}
+          onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
+        />
+        <SmallSelect
+          label="שפה"
+          value={form.language}
+          options={["he", "am", "ru"]}
+          onChange={(language) =>
+            onChange({ ...form, language: language as CandidateForm["language"] })
+          }
+        />
+        <SmallSelect
+          label="שלב"
+          value={form.stage}
+          options={["Lead", "Learning", "Test", "Placed"]}
+          onChange={(stage) => onChange({ ...form, stage: stage as CandidateForm["stage"] })}
+        />
       </div>
       <SmallInput label="הערה" value={form.note} onChange={(note) => onChange({ ...form, note })} />
       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-        <label><input type="checkbox" checked={form.idDocument} onChange={(event) => onChange({ ...form, idDocument: event.target.checked })} /> תעודת זהות</label>
-        <label><input type="checkbox" checked={form.greenForm} onChange={(event) => onChange({ ...form, greenForm: event.target.checked })} /> טופס ירוק</label>
+        <label>
+          <input
+            type="checkbox"
+            checked={form.idDocument}
+            onChange={(event) => onChange({ ...form, idDocument: event.target.checked })}
+          />{" "}
+          תעודת זהות
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={form.greenForm}
+            onChange={(event) => onChange({ ...form, greenForm: event.target.checked })}
+          />{" "}
+          טופס ירוק
+        </label>
       </div>
-      <Button variant="command" onClick={onSave}><Save className="h-4 w-4" /> שמור מועמד</Button>
+      <Button variant="command" onClick={onSave}>
+        <Save className="h-4 w-4" /> שמור מועמד
+      </Button>
     </div>
   );
 }
@@ -1105,9 +1192,24 @@ function AdminUsersPage({
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
-        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} type="password" minLength={8} />
-        <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
-        <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
+        <SmallInput
+          label="סיסמה זמנית"
+          value={password}
+          onChange={setPassword}
+          type="password"
+          minLength={8}
+        />
+        <SmallSelect
+          label="תפקיד"
+          value={role}
+          options={["operator", "viewer"]}
+          onChange={(value: string) => setRole(value as "operator" | "viewer")}
+        />
+        <Button
+          className="mt-4 min-h-11"
+          variant="command"
+          onClick={() => onInvite(email, password, role)}
+        >
           <UserPlus className="h-4 w-4" /> שלח הזמנה
         </Button>
         <p className="mt-3 text-sm text-muted-foreground">{status}</p>
@@ -1459,7 +1561,7 @@ function GradeBadge({ grade }: { grade: Candidate["grade"] }) {
 }
 
 function normalizeCandidate(row: CandidateRow): Candidate {
-  const fullName = normalizeName(row.full_name, row.phone);
+  const fullName = row.name || normalizeName(row.full_name, row.phone);
   const profile = normalizeProfile(row.localized_profile);
   const documentsReady = normalizeDocuments(row.documents);
   const score = typeof profile.score === "number" ? profile.score : null;
@@ -1530,13 +1632,6 @@ function gradeFromScore(score: number | null): Candidate["grade"] {
   return "C";
 }
 
-function pickRole(roles: string[]): AppRole | null {
-  if (roles.includes("super_admin")) return "super_admin";
-  if (roles.includes("operator")) return "operator";
-  if (roles.includes("viewer")) return "viewer";
-  return null;
-}
-
 function roleLabel(role: AppRole | null) {
   if (role === "super_admin") return "SUPER_ADMIN";
   if (role === "operator") return "OPERATOR";
@@ -1563,7 +1658,9 @@ function downloadCsv(filename: string, rows: Record<string, string | number | bo
   const headers = Object.keys(rows[0] ?? { ריק: "" });
   const csv = [
     headers.join(","),
-    ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(",")),
+    ...rows.map((row) =>
+      headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(","),
+    ),
   ].join("\n");
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
