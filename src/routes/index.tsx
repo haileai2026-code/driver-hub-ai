@@ -170,6 +170,7 @@ function HaileApp() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
   const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
+  const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
   const createAdmin = useServerFn(createFirstSuperAdmin);
@@ -327,6 +328,11 @@ function HaileApp() {
   };
 
   const saveCandidate = async () => {
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+
     if (!candidateForm.name.trim() || !candidateForm.phone.trim()) {
       setActionStatus("שם וטלפון הם שדות חובה.");
       return;
@@ -339,18 +345,19 @@ function HaileApp() {
       return;
     }
 
-    const result = await saveCandidateRow({
-      data: {
-        accessToken,
-        name: candidateForm.name,
-        phone: candidateForm.phone.replace(/[^+\d]/g, ""),
-        age: candidateForm.age ? Number(candidateForm.age) : null,
-        city: candidateForm.city,
-        stage: candidateForm.stage,
-        license: candidateForm.licenseStatus,
-        notes: candidateForm.note || null,
-      },
-    });
+    const payload = {
+      accessToken,
+      name: candidateForm.name,
+      phone: candidateForm.phone.replace(/[^+\d]/g, ""),
+      age: candidateForm.age ? Number(candidateForm.age) : null,
+      city: candidateForm.city,
+      stage: candidateForm.stage,
+      license: candidateForm.licenseStatus,
+      notes: candidateForm.note || null,
+    };
+    const result = editingId
+      ? await editCandidateRow({ data: { ...payload, id: editingId } })
+      : await saveCandidateRow({ data: payload });
 
     if (!result.ok) {
       setActionStatus(`שמירת מועמד נכשלה: ${result.message}`);
@@ -358,8 +365,42 @@ function HaileApp() {
     }
 
     setCandidateForm(emptyCandidateForm());
+    setEditingId(null);
     setActionStatus(result.message);
     await loadLiveData();
+  };
+
+  const startEditCandidate = (candidate: Candidate) => {
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+    setSelectedId(candidate.id);
+    setEditingId(candidate.id);
+    setCandidateForm(candidateToForm(candidate));
+    setActionStatus("מצב עריכה פעיל — שמירה תעדכן את המועמד הנבחר.");
+  };
+
+  const deleteSelectedCandidate = async () => {
+    if (!selected) return;
+    if (!canEdit) {
+      setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
+      return;
+    }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה לפני מחיקה.");
+      return;
+    }
+    const result = await removeCandidateRow({ data: { accessToken, id: selected.id } });
+    setActionStatus(result.ok ? result.message : `מחיקה נכשלה: ${result.message}`);
+    if (result.ok) {
+      setSelectedId(null);
+      setEditingId(null);
+      setCandidateForm(emptyCandidateForm());
+      await loadLiveData();
+    }
   };
 
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
