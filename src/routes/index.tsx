@@ -1105,7 +1105,7 @@ function AdminUsersPage({
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
-        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} />
+        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} type="password" minLength={8} />
         <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
         <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
           <UserPlus className="h-4 w-4" /> שלח הזמנה
