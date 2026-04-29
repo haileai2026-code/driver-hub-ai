@@ -153,6 +153,7 @@ function HaileApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -176,7 +177,9 @@ function HaileApp() {
   const getSessionRole = useServerFn(getAuthorizedSession);
   const loadAppData = useServerFn(getLiveAppData);
   const saveCandidateRow = useServerFn(createCandidate);
+  const editCandidateRow = useServerFn(updateCandidate);
   const updateStage = useServerFn(updateCandidateStage);
+  const removeCandidateRow = useServerFn(deleteCandidate);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
@@ -226,6 +229,7 @@ function HaileApp() {
     const normalized = (result.candidates ?? []).map(normalizeCandidate);
     setCandidates(normalized);
     setLogs(result.logs ?? []);
+    setSystemUsers(result.users ?? []);
     setSelectedId((current) => current ?? normalized[0]?.id ?? null);
     setIsLoadingData(false);
   };
@@ -247,6 +251,8 @@ function HaileApp() {
 
   const activeCandidates = candidates.filter((candidate) => candidate.stage !== "Placed").length;
   const placedCandidates = candidates.filter((candidate) => candidate.stage === "Placed").length;
+  const canEdit = authUser.role === "super_admin" || authUser.role === "operator";
+  const isSuperAdmin = authUser.role === "super_admin";
   const avgScore = average(
     candidates
       .map((candidate) => candidate.score)
