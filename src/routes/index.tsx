@@ -458,6 +458,7 @@ function HaileApp() {
     }
     const result = await inviteUser({ data: { accessToken, email, password, role } });
     setActionStatus(result.message);
+    if (result.ok) await loadLiveData();
   };
 
   const handleLogin = async (email: string, password: string) => {
