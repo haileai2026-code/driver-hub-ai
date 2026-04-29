@@ -55,7 +55,7 @@ import {
 } from "@/lib/app-data.functions";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
-import { generateHaileAiText } from "@/lib/haile-ai.functions";
+import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -173,6 +173,7 @@ function HaileApp() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
+  const applyAgentOperation = useServerFn(applyHaileAiOperation);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
   const getSessionRole = useServerFn(getAuthorizedSession);
@@ -313,21 +314,67 @@ function HaileApp() {
 
     setIsAiLoading(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setAiText("יש להתחבר עם משתמש מורשה.");
+        return;
+      }
+
       const result = await generateText({
         data: {
+          accessToken,
+          candidateId: selected.id,
           mode,
-          language:
-            selected.language === "עברית" ? "he" : selected.language === "רוסית" ? "ru" : "am",
-          candidateName: selected.name,
-          stage: selected.stage,
-          licenseStatus: selected.licenseStatus,
-          missingDocuments: selected.documentsReady ? [] : ["מסמכים חסרים"],
-          message: selected.note || "אין הודעה אחרונה שמורה למועמד.",
         },
       });
       setAiText(result.text);
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  const runAgentStatusUpdate = async () => {
+    if (!selected) {
+      setActionStatus("אין מועמד נבחר.");
+      return;
+    }
+
+    if (!canEdit) {
+      setActionStatus("רק משתמש עם הרשאת עריכה יכול להפעיל עדכון סוכן.");
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setActionStatus("יש להתחבר עם משתמש מורשה.");
+      return;
+    }
+
+    const nextStage =
+      selected.stage === "Lead"
+        ? "Learning"
+        : selected.stage === "Learning"
+          ? "Test"
+          : selected.stage === "Test"
+            ? "Placed"
+            : "Placed";
+
+    const result = await applyAgentOperation({
+      data: {
+        accessToken,
+        candidateId: selected.id,
+        stage: nextStage,
+        followUpRequired: nextStage !== "Placed",
+        note: `הסוכן קידם את ${selected.name} משלב ${stageLabels[selected.stage] ?? selected.stage} לשלב ${stageLabels[nextStage]}.`,
+      },
+    });
+
+    setActionStatus(result.message);
+    if (result.ok) {
+      await loadLiveData();
+      setAiText(`הסוכן מחובר לנתוני המועמד. סטטוס עודכן ל־${stageLabels[nextStage]}.`);
     }
   };
 
@@ -641,7 +688,16 @@ function HaileApp() {
                 isEditing={Boolean(editingId)}
               />
             )}
-            {activePage === "agents" && <AgentsPage />}
+            {activePage === "agents" && (
+              <AgentsPage
+                selected={selected}
+                canEdit={canEdit}
+                logs={logs}
+                onAi={runAi}
+                onApplyStatus={runAgentStatusUpdate}
+                actionStatus={actionStatus}
+              />
+            )}
             {activePage === "reports" && <ReportsPage />}
             {activePage === "sol" && <SolPage />}
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
@@ -1031,7 +1087,21 @@ function CandidatesPage({
   );
 }
 
-function AgentsPage() {
+function AgentsPage({
+  selected,
+  canEdit,
+  logs,
+  onAi,
+  onApplyStatus,
+  actionStatus,
+}: {
+  selected: Candidate | null;
+  canEdit: boolean;
+  logs: LogRow[];
+  onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onApplyStatus: () => void;
+  actionStatus: string;
+}) {
   const agents = [
     { name: "סוכן גיוס", icon: Bot, description: "מסנן לידים ומנהל שיחה ראשונית", tone: "primary" },
     {
@@ -1051,7 +1121,16 @@ function AgentsPage() {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {agents.map((agent) => (
-        <AgentCard key={agent.name} {...agent} />
+        <AgentCard
+          key={agent.name}
+          {...agent}
+          isConnected={Boolean(selected)}
+          activityCount={logs.length}
+          onPrimaryAction={selected ? (agent.name === "CIEL" ? onApplyStatus : () => onAi("candidate_next_step")) : undefined}
+          primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
+          selectedName={selected?.name ?? null}
+          statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
+        />
       ))}
     </div>
   );
@@ -1496,11 +1575,23 @@ function AgentCard({
   icon: Icon,
   description,
   tone,
+  isConnected,
+  activityCount,
+  onPrimaryAction,
+  primaryActionLabel,
+  selectedName,
+  statusText,
 }: {
   name: string;
   icon: typeof Bot;
   description: string;
   tone: string;
+  isConnected: boolean;
+  activityCount: number;
+  onPrimaryAction?: () => void;
+  primaryActionLabel: string;
+  selectedName: string | null;
+  statusText: string;
 }) {
   const iconTone =
     tone === "success"
@@ -1524,13 +1615,25 @@ function AgentCard({
           </div>
         </div>
         <span className="flex items-center gap-2 rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground" /> לא מחובר
+          <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted-foreground"}`} />
+          {isConnected ? "מחובר למועמד" : "לא מחובר"}
         </span>
       </div>
-      <SettingsGrid items={["פעולות היום: 0", "פעולות השבוע: 0", "לוג אחרון: אין נתונים"]} />
-      <Button className="mt-4" variant="tactical">
-        <SlidersHorizontal className="h-4 w-4" /> הגדרות סוכן
-      </Button>
+      <SettingsGrid
+        items={[
+          `מועמד פעיל: ${selectedName ?? "לא נבחר"}`,
+          `פעולות ביומן: ${activityCount}`,
+          statusText,
+        ]}
+      />
+      <div className="mt-4 flex gap-2">
+        <Button className="flex-1" variant="tactical" onClick={onPrimaryAction} disabled={!onPrimaryAction}>
+          <Bot className="h-4 w-4" /> {primaryActionLabel}
+        </Button>
+        <Button className="flex-1" variant="ghost" disabled>
+          <SlidersHorizontal className="h-4 w-4" /> {isConnected ? "Read/Write פעיל" : "ממתין לבחירה"}
+        </Button>
+      </div>
     </article>
   );
 }
