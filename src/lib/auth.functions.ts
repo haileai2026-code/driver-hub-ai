@@ -3,22 +3,40 @@ import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const FirstAdminInputSchema = z.object({
+  email: z.string().trim().max(255).catch(""),
+  password: z.string().max(120).catch(""),
+  fullName: z.string().trim().max(120).catch(""),
+});
+
 const FirstAdminSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8).max(120),
-  fullName: z.string().min(2).max(120),
+  email: z.string().trim().email("כתובת אימייל לא תקינה."),
+  password: z.string().min(8, "סיסמה חייבת להכיל לפחות 8 תווים.").max(120),
+  fullName: z.string().trim().min(2, "שם מלא חייב להכיל לפחות 2 תווים.").max(120),
+});
+
+const InviteInputSchema = z.object({
+  accessToken: z.string().max(5000).catch(""),
+  email: z.string().trim().max(255).catch(""),
+  password: z.string().max(120).catch(""),
+  role: z.enum(["operator", "viewer"]).catch("operator"),
 });
 
 const InviteSchema = z.object({
-  accessToken: z.string().min(20).max(5000),
-  email: z.string().email(),
-  password: z.string().min(8).max(120),
+  accessToken: z.string().min(20, "יש להתחבר כמנהל ראשי.").max(5000),
+  email: z.string().trim().email("כתובת אימייל לא תקינה."),
+  password: z.string().min(8, "סיסמה זמנית חייבת להכיל לפחות 8 תווים.").max(120),
   role: z.enum(["operator", "viewer"]),
 });
 
 export const createFirstSuperAdmin = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => FirstAdminSchema.parse(input))
+  .inputValidator((input: unknown) => FirstAdminInputSchema.parse(input))
   .handler(async ({ data }) => {
+    const parsed = FirstAdminSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, message: parsed.error.issues[0]?.message ?? "יש לבדוק את פרטי המנהל." };
+    }
+
     const { data: existingRole } = await supabaseAdmin.from("user_roles").select("id").limit(1).maybeSingle();
     if (existingRole) {
       return { ok: false, message: "כבר קיים מנהל ראשי במערכת. יש להתחבר או לבקש הזמנה." };
@@ -48,8 +66,13 @@ export const createFirstSuperAdmin = createServerFn({ method: "POST" })
   });
 
 export const inviteSystemUser = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => InviteSchema.parse(input))
+  .inputValidator((input: unknown) => InviteInputSchema.parse(input))
   .handler(async ({ data }) => {
+    const parsed = InviteSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, message: parsed.error.issues[0]?.message ?? "יש לבדוק את פרטי ההזמנה." };
+    }
+
     const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authError || !userData.user) {
       return { ok: false, message: "יש להתחבר כמנהל ראשי." };

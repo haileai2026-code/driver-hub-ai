@@ -344,6 +344,16 @@ function HaileApp() {
   };
 
   const handleInvite = async (email: string, password: string, role: "operator" | "viewer") => {
+    if (!email.trim() || !password.trim()) {
+      setActionStatus("יש למלא מייל וסיסמה זמנית.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setActionStatus("סיסמה זמנית חייבת להכיל לפחות 8 תווים.");
+      return;
+    }
+
     const { data } = await supabase.auth.getSession();
     const accessToken = data.session?.access_token;
     if (!accessToken) {
@@ -361,6 +371,16 @@ function HaileApp() {
   };
 
   const handleFirstAdmin = async (email: string, password: string, fullName: string) => {
+    if (!email.trim() || !password.trim() || !fullName.trim()) {
+      setAuthStatus("יש למלא שם, אימייל וסיסמה.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setAuthStatus("סיסמה חייבת להכיל לפחות 8 תווים.");
+      return;
+    }
+
     setAuthStatus("יוצר מנהל ראשי...");
     const result = await createAdmin({ data: { email, password, fullName } });
     setAuthStatus(result.message);
@@ -572,7 +592,7 @@ function AuthScreen({
           <Field label="שם מנהל ראשי" value={fullName} onChange={setFullName} />
         )}
         <Field label="אימייל" value={email} onChange={setEmail} type="email" />
-        <Field label="סיסמה" value={password} onChange={setPassword} type="password" />
+        <Field label="סיסמה" value={password} onChange={setPassword} type="password" minLength={mode === "firstAdmin" ? 8 : undefined} />
         <Button className="mt-4 w-full min-h-11" variant="command" type="submit">
           <KeyRound className="h-4 w-4" /> {mode === "firstAdmin" ? "צור מנהל ראשי" : "כניסה"}
         </Button>
@@ -604,11 +624,13 @@ function Field({
   value,
   onChange,
   type = "text",
+  minLength,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  minLength?: number;
 }) {
   return (
     <label className="mb-3 block text-sm font-bold">
@@ -616,6 +638,7 @@ function Field({
       <input
         required
         type={type}
+        minLength={minLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-primary"
@@ -628,15 +651,21 @@ function SmallInput({
   label,
   value,
   onChange,
+  type = "text",
+  minLength,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: string;
+  minLength?: number;
 }) {
   return (
     <label className="block text-xs font-bold text-muted-foreground">
       {label}
       <input
+        type={type}
+        minLength={minLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
@@ -1076,7 +1105,7 @@ function AdminUsersPage({
       </Panel>
       <Panel title="הזמנת משתמש חדש">
         <SmallInput label="מייל" value={email} onChange={setEmail} />
-        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} />
+        <SmallInput label="סיסמה זמנית" value={password} onChange={setPassword} type="password" minLength={8} />
         <SmallSelect label="תפקיד" value={role} options={["operator", "viewer"]} onChange={(value: string) => setRole(value as "operator" | "viewer")} />
         <Button className="mt-4 min-h-11" variant="command" onClick={() => onInvite(email, password, role)}>
           <UserPlus className="h-4 w-4" /> שלח הזמנה
