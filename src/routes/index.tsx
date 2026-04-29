@@ -1087,7 +1087,21 @@ function CandidatesPage({
   );
 }
 
-function AgentsPage() {
+function AgentsPage({
+  selected,
+  canEdit,
+  logs,
+  onAi,
+  onApplyStatus,
+  actionStatus,
+}: {
+  selected: Candidate | null;
+  canEdit: boolean;
+  logs: LogRow[];
+  onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
+  onApplyStatus: () => void;
+  actionStatus: string;
+}) {
   const agents = [
     { name: "סוכן גיוס", icon: Bot, description: "מסנן לידים ומנהל שיחה ראשונית", tone: "primary" },
     {
@@ -1107,7 +1121,16 @@ function AgentsPage() {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {agents.map((agent) => (
-        <AgentCard key={agent.name} {...agent} />
+        <AgentCard
+          key={agent.name}
+          {...agent}
+          isConnected={Boolean(selected)}
+          activityCount={logs.length}
+          onPrimaryAction={selected ? (agent.name === "CIEL" ? onApplyStatus : () => onAi("candidate_next_step")) : undefined}
+          primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
+          selectedName={selected?.name ?? null}
+          statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
+        />
       ))}
     </div>
   );
@@ -1552,11 +1575,23 @@ function AgentCard({
   icon: Icon,
   description,
   tone,
+  isConnected,
+  activityCount,
+  onPrimaryAction,
+  primaryActionLabel,
+  selectedName,
+  statusText,
 }: {
   name: string;
   icon: typeof Bot;
   description: string;
   tone: string;
+  isConnected: boolean;
+  activityCount: number;
+  onPrimaryAction?: () => void;
+  primaryActionLabel: string;
+  selectedName: string | null;
+  statusText: string;
 }) {
   const iconTone =
     tone === "success"
@@ -1580,13 +1615,25 @@ function AgentCard({
           </div>
         </div>
         <span className="flex items-center gap-2 rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground" /> לא מחובר
+          <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted-foreground"}`} />
+          {isConnected ? "מחובר למועמד" : "לא מחובר"}
         </span>
       </div>
-      <SettingsGrid items={["פעולות היום: 0", "פעולות השבוע: 0", "לוג אחרון: אין נתונים"]} />
-      <Button className="mt-4" variant="tactical">
-        <SlidersHorizontal className="h-4 w-4" /> הגדרות סוכן
-      </Button>
+      <SettingsGrid
+        items={[
+          `מועמד פעיל: ${selectedName ?? "לא נבחר"}`,
+          `פעולות ביומן: ${activityCount}`,
+          statusText,
+        ]}
+      />
+      <div className="mt-4 flex gap-2">
+        <Button className="flex-1" variant="tactical" onClick={onPrimaryAction} disabled={!onPrimaryAction}>
+          <Bot className="h-4 w-4" /> {primaryActionLabel}
+        </Button>
+        <Button className="flex-1" variant="ghost" disabled>
+          <SlidersHorizontal className="h-4 w-4" /> {isConnected ? "Read/Write פעיל" : "ממתין לבחירה"}
+        </Button>
+      </div>
     </article>
   );
 }
