@@ -6,8 +6,11 @@ import type { Database, TablesInsert } from "@/integrations/supabase/types";
 import { normalizeCityValue } from "@/lib/cities";
 
 type CandidateInsert = TablesInsert<"candidates">;
-type CandidateImportDraft = Omit<CandidateInsert, "city"> & { city?: CandidateInsert["city"] };
-type Language = Database["public"]["Enums"]["preferred_language"];
+type CandidateImportDraft = Omit<CandidateInsert, "city" | "phone" | "license"> & {
+  city?: CandidateInsert["city"] | null;
+  phone?: CandidateInsert["phone"] | null;
+  license?: CandidateInsert["license"] | null;
+};
 
 const CellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const ImportSchema = z.object({
@@ -66,14 +69,6 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
         continue;
       }
 
-      if (!mapped.phone) {
-        mapped.phone = "";
-      }
-
-      if (!mapped.city) {
-        mapped.city = "Other";
-      }
-
       const candidate = mapped as CandidateInsert;
       candidate.created_by = userData.user.id;
       candidate.license_status = normalizeLicense(String(candidate.license ?? ""));
@@ -104,9 +99,9 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
   return {
     name,
     age: normalizeAge(read(row, headerMap.age)),
-    city: normalizeCity(read(row, headerMap.city)),
-    phone,
-    license: normalizeLicense(read(row, headerMap.license)),
+    city: normalizeCity(read(row, headerMap.city)) ?? null,
+    phone: phone || null,
+    license: normalizeText(read(row, headerMap.license)),
     stage: normalizeStage(read(row, headerMap.stage)),
     notes: [noteHe, noteAm, noteRu].filter(Boolean).join("\n") || null,
     assigned_to: partner || null,
@@ -133,15 +128,13 @@ function normalizeAge(value: string) {
   return Number.isFinite(age) && age >= 16 && age <= 85 ? age : null;
 }
 
-function normalizeCity(value: string): CandidateInsert["city"] | undefined {
-  return normalizeCityValue(value) as CandidateInsert["city"] | undefined;
+function normalizeText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 }
 
-function normalizeLanguage(value: string): Language {
-  const normalized = normalizeHeader(value);
-  if (["he", "heb", "hebrew", "עברית"].includes(normalized)) return "he";
-  if (["ru", "rus", "russian", "רוסית", "русский"].includes(normalized)) return "ru";
-  return "am";
+function normalizeCity(value: string): CandidateInsert["city"] | undefined {
+  return normalizeCityValue(value) as CandidateInsert["city"] | undefined;
 }
 
 function normalizeStage(value: string): CandidateInsert["stage"] {
@@ -159,8 +152,4 @@ function normalizeLicense(value: string): CandidateInsert["license_status"] {
   if (["testscheduled", "טסטנקבע", "מבחןנקבע"].includes(normalized)) return "Test Scheduled";
   if (["licensed", "בעלרישיון", "רישיון"].includes(normalized)) return "Licensed";
   return "Not Started";
-}
-
-function normalizeBoolean(value: string) {
-  return ["true", "yes", "y", "1", "כן", "קיים", "received", "יש"].includes(normalizeHeader(value));
 }
