@@ -109,8 +109,10 @@ type Candidate = {
   grade: "A" | "B" | "C" | "—";
   score: number | null;
   createdAt: string;
+  updatedAt: string | null;
   documentsReady: boolean;
   note: string;
+  partner: string | null;
   nextStepDueAt: string | null;
   lastContactedAt: string | null;
 };
