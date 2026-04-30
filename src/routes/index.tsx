@@ -120,7 +120,7 @@ type CandidateForm = {
   name: string;
   phone: string;
   age: string;
-  city: "Ashkelon" | "Kiryat Gat";
+  city: CityOption;
   language: "he" | "am" | "ru";
   stage: "Lead" | "Learning" | "Test" | "Placed";
   licenseStatus: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
