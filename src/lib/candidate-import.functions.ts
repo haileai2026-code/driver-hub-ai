@@ -40,6 +40,8 @@ const headerMap = {
 export const importCandidatesFromRows = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ImportSchema.parse(input))
   .handler(async ({ data }) => {
+    console.log("[candidate-import] Raw parsed rows:", data.rows);
+
     const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authError || !userData.user) {
       return { inserted: 0, skipped: data.rows.length, errors: ["יש להתחבר לפני ייבוא מועמדים."] };
@@ -62,6 +64,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       const row = data.rows[index];
       const rowNumber = index + 2;
       const mapped = mapImportRow(row);
+      console.log(`[candidate-import] Mapped row ${rowNumber}:`, mapped);
 
       if (!mapped.name || !mapped.name.trim()) {
         errors.push(`שורה ${rowNumber}: חסר שם מועמד.`);
@@ -75,7 +78,10 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
 
       const { error: insertError } = await supabaseAdmin.from("candidates").insert(candidate);
       if (insertError) {
-        errors.push(`שורה ${rowNumber}: ${insertError.message}`);
+        console.error(`[candidate-import] Supabase insert error for row ${rowNumber}:`, insertError);
+        errors.push(
+          `שורה ${rowNumber}: ${insertError.message}${insertError.details ? ` | details: ${insertError.details}` : ""}${insertError.hint ? ` | hint: ${insertError.hint}` : ""}${insertError.code ? ` | code: ${insertError.code}` : ""}`,
+        );
         skipped++;
         continue;
       }
