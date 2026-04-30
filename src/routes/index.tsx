@@ -58,6 +58,11 @@ import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
+import {
+  checkAutomationAgents,
+  sendMissingDocsWhatsAppReminders,
+  type AutomationAgentStatus,
+} from "@/lib/automation-agents.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -170,15 +175,22 @@ function HaileApp() {
   const [isImporting, setIsImporting] = useState(false);
   const [aiText, setAiText] = useState("בחר מועמד כדי להפעיל תרגום או ניסוח הודעה.");
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [gmailReminder, setGmailReminder] = useState("לחץ Generate WhatsApp Reminder כדי ליצור תזכורת באמהרית מהודעת Gmail אחרונה.");
+  const [gmailReminder, setGmailReminder] = useState(
+    "לחץ Generate WhatsApp Reminder כדי ליצור תזכורת באמהרית מהודעת Gmail אחרונה.",
+  );
   const [isReminderLoading, setIsReminderLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
+  const [agentStatuses, setAgentStatuses] = useState<AutomationAgentStatus[]>([]);
+  const [isCheckingAgents, setIsCheckingAgents] = useState(false);
+  const [isSendingWhatsAppReminders, setIsSendingWhatsAppReminders] = useState(false);
   const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
   const generateReminder = useServerFn(generateGmailWhatsAppReminder);
   const applyAgentOperation = useServerFn(applyHaileAiOperation);
+  const checkAgents = useServerFn(checkAutomationAgents);
+  const sendDocsReminders = useServerFn(sendMissingDocsWhatsAppReminders);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
   const getSessionRole = useServerFn(getAuthorizedSession);
@@ -408,6 +420,44 @@ function HaileApp() {
     }
   };
 
+  const runAgentConnectionCheck = async () => {
+    setIsCheckingAgents(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setActionStatus("יש להתחבר עם משתמש מורשה כדי לבדוק סוכנים.");
+        return;
+      }
+      const result = await checkAgents({ data: { accessToken } });
+      setAgentStatuses(result.statuses);
+      setActionStatus(result.message);
+    } finally {
+      setIsCheckingAgents(false);
+    }
+  };
+
+  const runWhatsAppDocsReminders = async () => {
+    if (!canEdit) {
+      setActionStatus("רק משתמש עם הרשאת עריכה יכול להפעיל תזכורות WhatsApp.");
+      return;
+    }
+    setIsSendingWhatsAppReminders(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setActionStatus("יש להתחבר עם משתמש מורשה כדי להפעיל אוטומציה.");
+        return;
+      }
+      const result = await sendDocsReminders({ data: { accessToken } });
+      setActionStatus(result.message);
+      if (result.ok) await loadLiveData();
+    } finally {
+      setIsSendingWhatsAppReminders(false);
+    }
+  };
+
   const saveCandidate = async () => {
     if (!canEdit) {
       setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
@@ -613,27 +663,29 @@ function HaileApp() {
           </div>
 
           <nav className="space-y-2">
-            {navItems.filter((item) => !item.superOnly || isSuperAdmin).map((item) => {
-              const Icon = item.icon;
-              const active = activePage === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => handleNavigation(item.key)}
-                  className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 py-2 text-right text-sm font-bold transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-transparent text-muted-foreground hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}
-                >
-                  <span className="flex items-center gap-3">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </span>
-                  <span className="flex items-center gap-2 text-[10px] opacity-80">
-                    {item.superOnly && <KeyRound className="h-3 w-3" />}
-                    {item.path}
-                  </span>
-                </button>
-              );
-            })}
+            {navItems
+              .filter((item) => !item.superOnly || isSuperAdmin)
+              .map((item) => {
+                const Icon = item.icon;
+                const active = activePage === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleNavigation(item.key)}
+                    className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 py-2 text-right text-sm font-bold transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-transparent text-muted-foreground hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </span>
+                    <span className="flex items-center gap-2 text-[10px] opacity-80">
+                      {item.superOnly && <KeyRound className="h-3 w-3" />}
+                      {item.path}
+                    </span>
+                  </button>
+                );
+              })}
           </nav>
         </aside>
 
@@ -725,6 +777,11 @@ function HaileApp() {
                 logs={logs}
                 onAi={runAi}
                 onApplyStatus={runAgentStatusUpdate}
+                onCheckConnections={runAgentConnectionCheck}
+                onSendWhatsAppDocsReminders={runWhatsAppDocsReminders}
+                agentStatuses={agentStatuses}
+                isCheckingAgents={isCheckingAgents}
+                isSendingWhatsAppReminders={isSendingWhatsAppReminders}
                 actionStatus={actionStatus}
               />
             )}
@@ -1103,8 +1160,18 @@ function CandidatesPage({
       </Panel>
 
       <Panel title="פרופיל מועמד + CIEL">
-        <Notice tone={canEdit ? "success" : "warning"} text={canEdit ? actionStatus : "מצב צפייה בלבד — אין הרשאת עריכה למשתמש הזה."} />
-        {canEdit && <QuickCandidateForm form={form} onChange={onFormChange} onSave={onSaveCandidate} isEditing={isEditing} />}
+        <Notice
+          tone={canEdit ? "success" : "warning"}
+          text={canEdit ? actionStatus : "מצב צפייה בלבד — אין הרשאת עריכה למשתמש הזה."}
+        />
+        {canEdit && (
+          <QuickCandidateForm
+            form={form}
+            onChange={onFormChange}
+            onSave={onSaveCandidate}
+            isEditing={isEditing}
+          />
+        )}
         {!selected ? (
           <EmptyState text="בחר מועמד כדי לפתוח פרופיל." />
         ) : (
@@ -1130,6 +1197,11 @@ function AgentsPage({
   logs,
   onAi,
   onApplyStatus,
+  onCheckConnections,
+  onSendWhatsAppDocsReminders,
+  agentStatuses,
+  isCheckingAgents,
+  isSendingWhatsAppReminders,
   actionStatus,
 }: {
   selected: Candidate | null;
@@ -1137,6 +1209,11 @@ function AgentsPage({
   logs: LogRow[];
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
   onApplyStatus: () => void;
+  onCheckConnections: () => void;
+  onSendWhatsAppDocsReminders: () => void;
+  agentStatuses: AutomationAgentStatus[];
+  isCheckingAgents: boolean;
+  isSendingWhatsAppReminders: boolean;
   actionStatus: string;
 }) {
   const agents = [
@@ -1156,21 +1233,90 @@ function AgentsPage({
     },
   ];
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {agents.map((agent) => (
-        <AgentCard
-          key={agent.name}
-          {...agent}
-          isConnected={Boolean(selected)}
-          activityCount={logs.length}
-          onPrimaryAction={selected ? (agent.name === "CIEL" ? onApplyStatus : () => onAi("candidate_next_step")) : undefined}
-          primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
-          selectedName={selected?.name ?? null}
-          statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
-        />
-      ))}
+    <div className="space-y-4">
+      <Panel
+        title="מרכז הפעלה לכל הסוכנים"
+        action={
+          <Button variant="command" onClick={onCheckConnections} disabled={isCheckingAgents}>
+            <ShieldCheck className="h-4 w-4" />{" "}
+            {isCheckingAgents ? "בודק חיבורים..." : "בדוק זמינות סוכנים"}
+          </Button>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(agentStatuses.length ? agentStatuses : defaultAgentStatuses()).map((status) => (
+            <div
+              key={status.key}
+              className="rounded-md border border-border bg-surface p-3 text-sm"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <strong>{status.label}</strong>
+                <StatusBadge text={status.ready ? "זמין" : "דורש חיבור"} />
+              </div>
+              <p className="text-muted-foreground">{status.detail}</p>
+            </div>
+          ))}
+        </div>
+        <Button
+          className="mt-4 min-h-11"
+          variant="intel"
+          onClick={onSendWhatsAppDocsReminders}
+          disabled={!canEdit || isSendingWhatsAppReminders}
+        >
+          <Phone className="h-4 w-4" />{" "}
+          {isSendingWhatsAppReminders ? "שולח תזכורות..." : "הפעל תזכורות WhatsApp למסמכים חסרים"}
+        </Button>
+        <p className="mt-3 text-sm text-muted-foreground">{actionStatus}</p>
+      </Panel>
+      <div className="grid gap-4 md:grid-cols-2">
+        {agents.map((agent) => (
+          <AgentCard
+            key={agent.name}
+            {...agent}
+            isConnected={Boolean(selected)}
+            activityCount={logs.length}
+            onPrimaryAction={
+              selected
+                ? agent.name === "CIEL"
+                  ? onApplyStatus
+                  : () => onAi("candidate_next_step")
+                : undefined
+            }
+            primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
+            selectedName={selected?.name ?? null}
+            statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
+          />
+        ))}
+      </div>
     </div>
   );
+}
+
+function defaultAgentStatuses(): AutomationAgentStatus[] {
+  return [
+    { key: "gmail", label: "Gmail / SOL", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    {
+      key: "calendar",
+      label: "Google Calendar / SOL",
+      ready: false,
+      detail: "לחץ בדיקה כדי לוודא חיבור.",
+    },
+    { key: "docs", label: "Google Docs", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "sheets", label: "Google Sheets", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "drive", label: "Google Drive", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    {
+      key: "twilio_whatsapp",
+      label: "Twilio WhatsApp",
+      ready: false,
+      detail: "יש לחבר Twilio כדי לשלוח WhatsApp.",
+    },
+    {
+      key: "haile_ai",
+      label: "Haile AI Gateway",
+      ready: false,
+      detail: "לחץ בדיקה כדי לוודא זמינות AI.",
+    },
+  ];
 }
 
 function QuickCandidateForm({
@@ -1261,8 +1407,18 @@ function SolPage({
       <Panel title="חיבורים">
         <ConnectionRow icon={CalendarClock} label="Google Calendar" connected />
         <ConnectionRow icon={Mail} label="Gmail" connected />
-        <ConnectionRow icon={FileText} label="Google Docs" connected connectionId="std_01kqa4eyvefkb8f7b4ffadqyn0" />
-        <ConnectionRow icon={Database} label="Google Sheets" connected connectionId="std_01kqa4gs49fm7t66jzne5zkg2x" />
+        <ConnectionRow
+          icon={FileText}
+          label="Google Docs"
+          connected
+          connectionId="std_01kqa4eyvefkb8f7b4ffadqyn0"
+        />
+        <ConnectionRow
+          icon={Database}
+          label="Google Sheets"
+          connected
+          connectionId="std_01kqa4gs49fm7t66jzne5zkg2x"
+        />
       </Panel>
       <Panel title="שיחה עם SOL">
         <div className="space-y-3">
@@ -1274,7 +1430,8 @@ function SolPage({
             ]}
           />
           <Button variant="command" onClick={onGenerateReminder} disabled={isLoading}>
-            <Mail className="h-4 w-4" /> {isLoading ? "מייצר תזכורת..." : "Generate WhatsApp Reminder"}
+            <Mail className="h-4 w-4" />{" "}
+            {isLoading ? "מייצר תזכורת..." : "Generate WhatsApp Reminder"}
           </Button>
           <div className="rounded-md border border-border bg-background/60 p-4 text-sm leading-7 text-foreground">
             {reminder}
@@ -1423,7 +1580,10 @@ function AdminUsersPage({
         ) : (
           <div className="space-y-2">
             {users.map((user) => (
-              <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3">
+              <div
+                key={user.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3"
+              >
                 <span className="font-bold">{user.email}</span>
                 <StatusBadge text={roleLabel(user.role as AppRole)} />
               </div>
@@ -1680,7 +1840,9 @@ function AgentCard({
           </div>
         </div>
         <span className="flex items-center gap-2 rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
-          <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted-foreground"}`} />
+          <span
+            className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted-foreground"}`}
+          />
           {isConnected ? "מחובר למועמד" : "לא מחובר"}
         </span>
       </div>
@@ -1692,11 +1854,17 @@ function AgentCard({
         ]}
       />
       <div className="mt-4 flex gap-2">
-        <Button className="flex-1" variant="tactical" onClick={onPrimaryAction} disabled={!onPrimaryAction}>
+        <Button
+          className="flex-1"
+          variant="tactical"
+          onClick={onPrimaryAction}
+          disabled={!onPrimaryAction}
+        >
           <Bot className="h-4 w-4" /> {primaryActionLabel}
         </Button>
         <Button className="flex-1" variant="ghost" disabled>
-          <SlidersHorizontal className="h-4 w-4" /> {isConnected ? "Read/Write פעיל" : "ממתין לבחירה"}
+          <SlidersHorizontal className="h-4 w-4" />{" "}
+          {isConnected ? "Read/Write פעיל" : "ממתין לבחירה"}
         </Button>
       </div>
     </article>
@@ -1962,12 +2130,14 @@ function candidateToForm(candidate: Candidate): CandidateForm {
     age: candidate.age ? String(candidate.age) : "",
     city: candidate.city === "Kiryat Gat" ? "Kiryat Gat" : "Ashkelon",
     language: candidate.language === "עברית" ? "he" : candidate.language === "רוסית" ? "ru" : "am",
-    stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(candidate.stage as CandidateForm["stage"])
+    stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(
+      candidate.stage as CandidateForm["stage"],
+    )
       ? (candidate.stage as CandidateForm["stage"])
       : "Lead",
-    licenseStatus: (["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const).includes(
-      candidate.licenseStatus as CandidateForm["licenseStatus"],
-    )
+    licenseStatus: (
+      ["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const
+    ).includes(candidate.licenseStatus as CandidateForm["licenseStatus"])
       ? (candidate.licenseStatus as CandidateForm["licenseStatus"])
       : "Not Started",
     note: candidate.note,
