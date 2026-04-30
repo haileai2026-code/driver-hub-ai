@@ -341,7 +341,7 @@ function HaileApp() {
       }
 
       const summary = `ייבוא הושלם: ${totalInserted} נשמרו, ${totalSkipped} דולגו.`;
-      const errorTail = allErrors.length ? ` שגיאות: ${allErrors.slice(0, 3).join(" | ")}${allErrors.length > 3 ? ` (+${allErrors.length - 3})` : ""}` : "";
+      const errorTail = allErrors.length ? `\n${allErrors.join("\n")}` : "";
       setImportStatus(summary + errorTail);
       if (totalInserted > 0) {
         setImportRows([]);
@@ -1188,7 +1188,7 @@ function CandidatesPage({
       >
         {(importStatus || importRows > 0) ? (
           <div className="mb-4 space-y-1 rounded-md border border-border bg-surface p-3 text-xs">
-            <p className="text-muted-foreground">{importStatus}</p>
+            <p className="whitespace-pre-wrap text-muted-foreground">{importStatus}</p>
             {importRows > 0 && (
               <p className="font-medium text-foreground">
                 תצוגה מקדימה: {importRows} שורות מוכנות. לחץ "ייבא" לשמירה.
