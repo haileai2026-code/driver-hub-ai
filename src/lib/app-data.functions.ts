@@ -16,6 +16,8 @@ const CandidateSchema = AccessTokenSchema.extend({
   stage: z.enum(["Lead", "Learning", "Test", "Placed"]),
   license: z.enum(["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"]),
   notes: z.string().trim().max(2000).nullable(),
+  language: z.enum(["he", "am", "ru"]).optional(),
+  partner: z.enum(["Egged", "Afikim", "Other"]).nullable().optional(),
 });
 
 const CandidateUpdateSchema = CandidateSchema.extend({
