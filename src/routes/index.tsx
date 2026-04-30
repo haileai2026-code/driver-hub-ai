@@ -1086,6 +1086,8 @@ function SmallInput({
   );
 }
 
+type SmallSelectOption = string | { value: string; label: string };
+
 function SmallSelect({
   label,
   value,
@@ -1094,7 +1096,7 @@ function SmallSelect({
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: SmallSelectOption[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -1105,11 +1107,15 @@ function SmallSelect({
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const v = typeof option === "string" ? option : option.value;
+          const l = typeof option === "string" ? option : option.label;
+          return (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
