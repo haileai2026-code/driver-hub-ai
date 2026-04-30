@@ -2869,7 +2869,16 @@ async function parseImportFile(
   file: File,
 ): Promise<Record<string, string | number | boolean | null>[]> {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array", raw: false });
+  const isCsv = /\.csv$/i.test(file.name) || file.type === "text/csv";
+  let workbook: XLSX.WorkBook;
+  if (isCsv) {
+    // Decode CSV explicitly as UTF-8 (with BOM stripping) so Hebrew is preserved.
+    let text = new TextDecoder("utf-8").decode(buffer);
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    workbook = XLSX.read(text, { type: "string", raw: false });
+  } else {
+    workbook = XLSX.read(buffer, { type: "array", raw: false });
+  }
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("הקובץ ריק או לא תקין.");
   const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(workbook.Sheets[sheetName], {
