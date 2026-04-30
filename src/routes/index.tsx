@@ -58,6 +58,11 @@ import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
+import {
+  checkAutomationAgents,
+  sendMissingDocsWhatsAppReminders,
+  type AutomationAgentStatus,
+} from "@/lib/automation-agents.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -173,12 +178,17 @@ function HaileApp() {
   const [gmailReminder, setGmailReminder] = useState("לחץ Generate WhatsApp Reminder כדי ליצור תזכורת באמהרית מהודעת Gmail אחרונה.");
   const [isReminderLoading, setIsReminderLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("המערכת מוכנה לפעולה.");
+  const [agentStatuses, setAgentStatuses] = useState<AutomationAgentStatus[]>([]);
+  const [isCheckingAgents, setIsCheckingAgents] = useState(false);
+  const [isSendingWhatsAppReminders, setIsSendingWhatsAppReminders] = useState(false);
   const [candidateForm, setCandidateForm] = useState<CandidateForm>(emptyCandidateForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const importCandidates = useServerFn(importCandidatesFromRows);
   const generateText = useServerFn(generateHaileAiText);
   const generateReminder = useServerFn(generateGmailWhatsAppReminder);
   const applyAgentOperation = useServerFn(applyHaileAiOperation);
+  const checkAgents = useServerFn(checkAutomationAgents);
+  const sendDocsReminders = useServerFn(sendMissingDocsWhatsAppReminders);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
   const getSessionRole = useServerFn(getAuthorizedSession);
