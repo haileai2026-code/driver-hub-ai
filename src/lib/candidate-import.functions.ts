@@ -60,10 +60,14 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       const rowNumber = index + 2;
       const mapped = mapImportRow(row);
 
-      if (!mapped.phone) {
-        errors.push(`שורה ${rowNumber}: חסר מספר טלפון.`);
+      if (!mapped.name || !mapped.name.trim()) {
+        errors.push(`שורה ${rowNumber}: חסר שם מועמד.`);
         skipped++;
         continue;
+      }
+
+      if (!mapped.phone) {
+        mapped.phone = "";
       }
 
       if (!mapped.city) {
@@ -94,7 +98,7 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
   const noteHe = read(row, headerMap.notesHe);
   const noteAm = read(row, headerMap.notesAm);
   const noteRu = read(row, headerMap.notesRu);
-  const name = nameHe || nameAm || nameRu || phone;
+  const name = nameHe || nameAm || nameRu;
 
   const partner = read(row, headerMap.partner);
   return {
