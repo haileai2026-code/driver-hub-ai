@@ -881,6 +881,8 @@ function HaileApp() {
                 isAiLoading={isAiLoading}
                 canEdit={canEdit}
                 isEditing={Boolean(editingId)}
+                onInlineSave={inlineEditCandidate}
+                onInlineNote={inlineAddNote}
               />
             )}
             {activePage === "agents" && (
