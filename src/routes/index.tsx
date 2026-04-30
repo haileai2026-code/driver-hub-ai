@@ -2619,7 +2619,7 @@ function CandidateEditPanel({
           >
             {CITY_OPTIONS.map((city) => (
               <option key={city} value={city}>
-                {city}
+                {CITY_LABELS_HE[city]}
               </option>
             ))}
           </select>
