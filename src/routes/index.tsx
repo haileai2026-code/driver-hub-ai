@@ -2763,7 +2763,7 @@ function CandidateProfile({
         <div>
           <h3 className="text-2xl font-black">{candidate.name}</h3>
           <p className="text-sm text-muted-foreground">
-            {formatPhone(candidate.phone)} · {candidate.city}
+            {formatPhone(candidate.phone)} · {cityLabel(candidate.city)}
           </p>
         </div>
       </div>
