@@ -39,7 +39,8 @@ async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
   return { ok: true as const, userId: userData.user.id, role };
 }
 
-function normalizeWhatsAppPhone(phone: string) {
+function normalizeWhatsAppPhone(phone: string | null) {
+  if (!phone) return "";
   const cleaned = phone.replace(/[^+\d]/g, "");
   if (cleaned.startsWith("+")) return `whatsapp:${cleaned}`;
   if (cleaned.startsWith("0")) return `whatsapp:+972${cleaned.slice(1)}`;
@@ -156,6 +157,11 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
     let skipped = 0;
     for (const candidate of candidates ?? []) {
       if (!hasMissingDocuments(candidate.documents)) {
+        skipped += 1;
+        continue;
+      }
+
+      if (!candidate.phone) {
         skipped += 1;
         continue;
       }
