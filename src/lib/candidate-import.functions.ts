@@ -67,7 +67,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       }
 
       if (!mapped.city) {
-        mapped.city = "Ashkelon";
+        mapped.city = "Other";
       }
 
       const candidate = mapped as CandidateInsert;
