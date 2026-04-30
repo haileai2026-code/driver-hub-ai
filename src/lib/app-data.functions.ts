@@ -139,19 +139,23 @@ export const updateCandidate = createServerFn({ method: "POST" })
     const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
     if (!auth.ok) return { ok: false as const, message: auth.message };
 
+    const updatePayload: Record<string, unknown> = {
+      name: data.name,
+      phone: data.phone,
+      age: data.age,
+      city: data.city,
+      stage: data.stage,
+      license: data.license,
+      license_status: data.license,
+      notes: data.notes,
+      updated_at: new Date().toISOString(),
+    };
+    if (data.language) updatePayload.preferred_language = data.language;
+    if (data.partner !== undefined) updatePayload.assigned_to = data.partner;
+
     const { error } = await supabaseAdmin
       .from("candidates")
-      .update({
-        name: data.name,
-        phone: data.phone,
-        age: data.age,
-        city: data.city,
-        stage: data.stage,
-        license: data.license,
-        license_status: data.license,
-        notes: data.notes,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", data.id);
 
     return error
