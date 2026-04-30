@@ -64,6 +64,7 @@ import {
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
+import { CITY_OPTIONS, type CityOption, normalizeCityValue } from "@/lib/cities";
 
 export const Route = createFileRoute("/")({
   head: () => ({
