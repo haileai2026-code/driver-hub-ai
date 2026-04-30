@@ -669,7 +669,7 @@ function HaileApp() {
     const rows = candidates.map((candidate) => ({
       שם: candidate.name,
       טלפון: formatPhone(candidate.phone),
-      עיר: candidate.city,
+      עיר: cityLabel(candidate.city),
       שפה: candidate.language,
       סטטוס: stageLabels[candidate.stage] ?? candidate.stage,
       רישיון: candidate.licenseStatus,
