@@ -39,6 +39,54 @@ export const CITY_OPTIONS = [
 
 export type CityOption = (typeof CITY_OPTIONS)[number];
 
+// Hebrew display labels for each city. Stored DB values stay in English (enum),
+// but the UI always shows the Hebrew label.
+export const CITY_LABELS_HE: Record<CityOption, string> = {
+  Ashkelon: "אשקלון",
+  "Kiryat Gat": "קרית גת",
+  Ashdod: "אשדוד",
+  "Tel Aviv": "תל אביב",
+  Jerusalem: "ירושלים",
+  Haifa: "חיפה",
+  "Beer Sheva": "באר שבע",
+  Netanya: "נתניה",
+  "Rishon LeZion": "ראשון לציון",
+  "Petah Tikva": "פתח תקווה",
+  Holon: "חולון",
+  "Bnei Brak": "בני ברק",
+  "Ramat Gan": "רמת גן",
+  "Bat Yam": "בת ים",
+  Rehovot: "רחובות",
+  Herzliya: "הרצליה",
+  "Kfar Saba": "כפר סבא",
+  Modiin: "מודיעין",
+  Eilat: "אילת",
+  Tiberias: "טבריה",
+  Nazareth: "נצרת",
+  Acre: "עכו",
+  Lod: "לוד",
+  Ramla: "רמלה",
+  Afula: "עפולה",
+  Nahariya: "נהריה",
+  "Nes Ziona": "נס ציונה",
+  "Beit Shemesh": "בית שמש",
+  "Kiryat Ata": "קרית אתא",
+  "Kiryat Bialik": "קרית ביאליק",
+  "Rosh HaAyin": "ראש העין",
+  Yavne: "יבנה",
+  Dimona: "דימונה",
+  Sderot: "שדרות",
+  "Beit Shean": "בית שאן",
+  Other: "אחר",
+};
+
+export function cityLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  if ((CITY_LABELS_HE as Record<string, string>)[value]) return CITY_LABELS_HE[value as CityOption];
+  const canonical = normalizeCityValue(value);
+  return canonical ? CITY_LABELS_HE[canonical] : value;
+}
+
 // Map common Hebrew/English variants to canonical enum value.
 const CITY_ALIASES: Record<string, CityOption> = {
   ashkelon: "Ashkelon", אשקלון: "Ashkelon",
