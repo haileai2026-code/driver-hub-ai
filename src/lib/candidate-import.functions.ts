@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, TablesInsert } from "@/integrations/supabase/types";
+import { normalizeCityValue } from "@/lib/cities";
 
 type CandidateInsert = TablesInsert<"candidates">;
 type CandidateImportDraft = Omit<CandidateInsert, "city"> & { city?: CandidateInsert["city"] };
@@ -66,7 +67,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       }
 
       if (!mapped.city) {
-        mapped.city = "Ashkelon";
+        mapped.city = "Other";
       }
 
       const candidate = mapped as CandidateInsert;
@@ -129,10 +130,7 @@ function normalizeAge(value: string) {
 }
 
 function normalizeCity(value: string): CandidateInsert["city"] | undefined {
-  const normalized = normalizeHeader(value);
-  if (["ashkelon", "אשקלון"].includes(normalized)) return "Ashkelon";
-  if (["kiryatgat", "קריתגת", "קרייתגת"].includes(normalized)) return "Kiryat Gat";
-  return undefined;
+  return normalizeCityValue(value) as CandidateInsert["city"] | undefined;
 }
 
 function normalizeLanguage(value: string): Language {

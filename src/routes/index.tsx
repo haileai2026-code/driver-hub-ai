@@ -64,6 +64,7 @@ import {
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
+import { CITY_OPTIONS, type CityOption, normalizeCityValue } from "@/lib/cities";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -120,7 +121,7 @@ type CandidateForm = {
   name: string;
   phone: string;
   age: string;
-  city: "Ashkelon" | "Kiryat Gat";
+  city: CityOption;
   language: "he" | "am" | "ru";
   stage: "Lead" | "Learning" | "Test" | "Placed";
   licenseStatus: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
@@ -2040,7 +2041,7 @@ function QuickCandidateForm({
         <SmallSelect
           label="עיר"
           value={form.city}
-          options={["Ashkelon", "Kiryat Gat"]}
+          options={[...CITY_OPTIONS]}
           onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
         />
         <SmallSelect
@@ -2824,7 +2825,7 @@ function candidateToForm(candidate: Candidate): CandidateForm {
     name: candidate.name,
     phone: candidate.phone,
     age: candidate.age ? String(candidate.age) : "",
-    city: candidate.city === "Kiryat Gat" ? "Kiryat Gat" : "Ashkelon",
+    city: (normalizeCityValue(String(candidate.city ?? "")) ?? (candidate.city as CityOption | undefined) ?? "Other"),
     language: candidate.language === "עברית" ? "he" : candidate.language === "רוסית" ? "ru" : "am",
     stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(
       candidate.stage as CandidateForm["stage"],
