@@ -1451,7 +1451,7 @@ function AgentsPage({
               <option value="">— בחר מועמד —</option>
               {candidates.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} · {stageLabels[c.stage] ?? c.stage} · {c.city} · {c.language}
+                  {c.name} · {stageLabels[c.stage] ?? c.stage} · {cityLabel(c.city)} · {c.language}
                 </option>
               ))}
             </select>
