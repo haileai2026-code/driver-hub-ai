@@ -1590,7 +1590,7 @@ function AgentShell({
       {selected ? (
         <div className="mb-3 rounded-md border border-border bg-surface p-3 text-xs text-muted-foreground">
           <strong className="text-foreground">{selected.name}</strong> ·{" "}
-          {stageLabels[selected.stage] ?? selected.stage} · {selected.city} · {selected.language}
+          {stageLabels[selected.stage] ?? selected.stage} · {cityLabel(selected.city)} · {selected.language}
         </div>
       ) : (
         <div className="mb-3 rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
