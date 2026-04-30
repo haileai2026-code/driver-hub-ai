@@ -2836,7 +2836,7 @@ function CandidateTable({
             <tr key={candidate.id} className="border-b border-border/70">
               <td className="p-3 font-bold">{candidate.name}</td>
               <td className="p-3">{formatPhone(candidate.phone)}</td>
-              <td className="p-3">{candidate.city}</td>
+              <td className="p-3">{cityLabel(candidate.city)}</td>
               <td className="p-3">{candidate.score ?? "—"}</td>
               <td className="p-3">
                 <GradeBadge grade={candidate.grade} />
