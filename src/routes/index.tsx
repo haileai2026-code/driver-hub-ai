@@ -2723,16 +2723,16 @@ function GradeBadge({ grade }: { grade: Candidate["grade"] }) {
 }
 
 function normalizeCandidate(row: CandidateRow): Candidate {
-  const fullName = row.name || normalizeName(row.full_name, row.phone);
+  const fullName = row.name || normalizeName(row.full_name, row.phone ?? "");
   const profile = normalizeProfile(row.localized_profile);
   const documentsReady = normalizeDocuments(row.documents);
   const score = typeof profile.score === "number" ? profile.score : null;
   return {
     id: row.id,
     name: fullName,
-    phone: row.phone,
+    phone: row.phone ?? "",
     age: row.age,
-    city: String(row.city),
+    city: row.city ? String(row.city) : "Other",
     language: languageLabel(row.preferred_language),
     langCode: (row.preferred_language === "he" || row.preferred_language === "ru" ? row.preferred_language : "am") as "he" | "am" | "ru",
     licenseStatus: row.license_status,
