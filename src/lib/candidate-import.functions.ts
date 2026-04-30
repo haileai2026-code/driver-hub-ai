@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, TablesInsert } from "@/integrations/supabase/types";
+import { normalizeCityValue } from "@/lib/cities";
 
 type CandidateInsert = TablesInsert<"candidates">;
 type CandidateImportDraft = Omit<CandidateInsert, "city"> & { city?: CandidateInsert["city"] };
