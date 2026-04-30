@@ -60,11 +60,20 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
     let inserted = 0;
     let skipped = 0;
 
+    if (data.rows.length > 0) {
+      const detectedHeaders = Object.keys(data.rows[0]);
+      console.log("[candidate-import] Detected CSV headers:", detectedHeaders);
+      console.log(
+        "[candidate-import] Normalized headers:",
+        detectedHeaders.map((h) => ({ raw: h, normalized: normalizeHeader(h) })),
+      );
+    }
+
     for (let index = 0; index < data.rows.length; index++) {
       const row = data.rows[index];
       const rowNumber = index + 2;
       const mapped = mapImportRow(row);
-      console.log(`[candidate-import] Mapped row ${rowNumber}:`, mapped);
+      console.log(`[candidate-import] Row ${rowNumber} keys:`, Object.keys(row), "mapped:", mapped);
 
       if (!mapped.name || !mapped.name.trim()) {
         errors.push(`שורה ${rowNumber}: חסר שם מועמד.`);
