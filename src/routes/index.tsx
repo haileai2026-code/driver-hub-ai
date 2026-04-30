@@ -619,6 +619,7 @@ function HaileApp() {
     return { ok: result.ok, message: result.message };
   };
 
+  const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
     if (!canEdit) {
       setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
