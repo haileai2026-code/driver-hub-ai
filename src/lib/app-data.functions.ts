@@ -12,7 +12,7 @@ const CandidateSchema = AccessTokenSchema.extend({
   name: z.string().trim().min(1).max(160),
   phone: z.string().trim().min(5).max(30),
   age: z.number().int().min(16).max(90).nullable(),
-  city: z.enum(CITY_OPTIONS as unknown as [string, ...string[]]),
+  city: z.enum(CITY_OPTIONS),
   stage: z.enum(["Lead", "Learning", "Test", "Placed"]),
   license: z.enum(["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"]),
   notes: z.string().trim().max(2000).nullable(),
