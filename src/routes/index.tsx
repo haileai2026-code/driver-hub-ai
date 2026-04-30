@@ -1763,7 +1763,7 @@ function VoiceAgentPanel({
   const buildQuestions = () => {
     if (!selected) return;
     const q = [
-      `שלום ${selected.name}, האם תוכל/י לעבוד 5 ימים בשבוע ב${selected.city}?`,
+      `שלום ${selected.name}, האם תוכל/י לעבוד 5 ימים בשבוע ב${cityLabel(selected.city)}?`,
       `מה הניסיון שלך בנהיגה מסחרית? סטטוס רישיון נוכחי: ${selected.licenseStatus}.`,
       `האם המסמכים (ת.ז + טופס ירוק) זמינים? סטטוס נוכחי: ${selected.documentsReady ? "מוכן" : "חסר"}.`,
       "מתי תוכל/י להתחיל הכשרה?",
