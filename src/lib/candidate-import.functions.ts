@@ -22,7 +22,7 @@ const headerMap = {
   nameHe: ["name_he", "hebrew_name", "full_name_he", "שם", "שם מלא", "שם בעברית", "שם_בעברית"],
   nameAm: ["name_am", "amharic_name", "full_name_am", "שם באמהרית", "אמהרית", "ስም"],
   nameRu: ["name_ru", "russian_name", "full_name_ru", "שם ברוסית", "רוסית", "имя"],
-  name: ["full_name", "name", "driver", "candidate", "מועמד", "נהג", "שם מועמד"],
+  name: ["שם", "שם מלא", "name", "full name", "שם_מלא", "full_name", "driver", "candidate", "מועמד", "נהג", "שם מועמד"],
   age: ["age", "גיל", "возраст"],
   city: ["city", "עיר", "город"],
   phone: ["phone", "mobile", "whatsapp", "טלפון", "נייד", "וואטסאפ"],
@@ -60,11 +60,20 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
     let inserted = 0;
     let skipped = 0;
 
+    if (data.rows.length > 0) {
+      const detectedHeaders = Object.keys(data.rows[0]);
+      console.log("[candidate-import] Detected CSV headers:", detectedHeaders);
+      console.log(
+        "[candidate-import] Normalized headers:",
+        detectedHeaders.map((h) => ({ raw: h, normalized: normalizeHeader(h) })),
+      );
+    }
+
     for (let index = 0; index < data.rows.length; index++) {
       const row = data.rows[index];
       const rowNumber = index + 2;
       const mapped = mapImportRow(row);
-      console.log(`[candidate-import] Mapped row ${rowNumber}:`, mapped);
+      console.log(`[candidate-import] Row ${rowNumber} keys:`, Object.keys(row), "mapped:", mapped);
 
       if (!mapped.name || !mapped.name.trim()) {
         errors.push(`שורה ${rowNumber}: חסר שם מועמד.`);
