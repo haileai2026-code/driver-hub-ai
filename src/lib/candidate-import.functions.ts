@@ -22,7 +22,7 @@ const headerMap = {
   nameHe: ["name_he", "hebrew_name", "full_name_he", "שם", "שם מלא", "שם בעברית", "שם_בעברית"],
   nameAm: ["name_am", "amharic_name", "full_name_am", "שם באמהרית", "אמהרית", "ስም"],
   nameRu: ["name_ru", "russian_name", "full_name_ru", "שם ברוסית", "רוסית", "имя"],
-  name: ["full_name", "name", "driver", "candidate", "מועמד", "נהג", "שם מועמד"],
+  name: ["שם", "שם מלא", "name", "full name", "שם_מלא", "full_name", "driver", "candidate", "מועמד", "נהג", "שם מועמד"],
   age: ["age", "גיל", "возраст"],
   city: ["city", "עיר", "город"],
   phone: ["phone", "mobile", "whatsapp", "טלפון", "נייד", "וואטסאפ"],
