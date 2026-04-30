@@ -63,6 +63,7 @@ import {
   sendMissingDocsWhatsAppReminders,
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
+import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
