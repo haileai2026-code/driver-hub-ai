@@ -155,7 +155,8 @@ export const updateCandidate = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin
       .from("candidates")
-      .update(updatePayload)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update(updatePayload as any)
       .eq("id", data.id);
 
     return error
