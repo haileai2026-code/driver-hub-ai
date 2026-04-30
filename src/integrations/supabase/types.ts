@@ -366,7 +366,43 @@ export type Database = {
         | "operator"
       asset_status: "active" | "service_due" | "in_service" | "inactive"
       bus_company: "Egged" | "Afikim"
-      candidate_city: "Ashkelon" | "Kiryat Gat"
+      candidate_city:
+        | "Ashkelon"
+        | "Kiryat Gat"
+        | "Ashdod"
+        | "Tel Aviv"
+        | "Jerusalem"
+        | "Haifa"
+        | "Beer Sheva"
+        | "Netanya"
+        | "Rishon LeZion"
+        | "Petah Tikva"
+        | "Holon"
+        | "Bnei Brak"
+        | "Ramat Gan"
+        | "Bat Yam"
+        | "Rehovot"
+        | "Herzliya"
+        | "Kfar Saba"
+        | "Modiin"
+        | "Eilat"
+        | "Tiberias"
+        | "Nazareth"
+        | "Acre"
+        | "Lod"
+        | "Ramla"
+        | "Afula"
+        | "Nahariya"
+        | "Nes Ziona"
+        | "Beit Shemesh"
+        | "Kiryat Ata"
+        | "Kiryat Bialik"
+        | "Rosh HaAyin"
+        | "Yavne"
+        | "Dimona"
+        | "Sderot"
+        | "Beit Shean"
+        | "Other"
       candidate_stage: "Lead" | "Learning" | "Test" | "Placed"
       finance_entry_type:
         | "revenue_pending"
@@ -521,7 +557,44 @@ export const Constants = {
       ],
       asset_status: ["active", "service_due", "in_service", "inactive"],
       bus_company: ["Egged", "Afikim"],
-      candidate_city: ["Ashkelon", "Kiryat Gat"],
+      candidate_city: [
+        "Ashkelon",
+        "Kiryat Gat",
+        "Ashdod",
+        "Tel Aviv",
+        "Jerusalem",
+        "Haifa",
+        "Beer Sheva",
+        "Netanya",
+        "Rishon LeZion",
+        "Petah Tikva",
+        "Holon",
+        "Bnei Brak",
+        "Ramat Gan",
+        "Bat Yam",
+        "Rehovot",
+        "Herzliya",
+        "Kfar Saba",
+        "Modiin",
+        "Eilat",
+        "Tiberias",
+        "Nazareth",
+        "Acre",
+        "Lod",
+        "Ramla",
+        "Afula",
+        "Nahariya",
+        "Nes Ziona",
+        "Beit Shemesh",
+        "Kiryat Ata",
+        "Kiryat Bialik",
+        "Rosh HaAyin",
+        "Yavne",
+        "Dimona",
+        "Sderot",
+        "Beit Shean",
+        "Other",
+      ],
       candidate_stage: ["Lead", "Learning", "Test", "Placed"],
       finance_entry_type: [
         "revenue_pending",
