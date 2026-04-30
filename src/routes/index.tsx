@@ -63,6 +63,7 @@ import {
   sendMissingDocsWhatsAppReminders,
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
+import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -101,6 +102,7 @@ type Candidate = {
   age: number | null;
   city: string;
   language: string;
+  langCode: "he" | "am" | "ru";
   licenseStatus: string;
   stage: string;
   grade: "A" | "B" | "C" | "—";
@@ -108,6 +110,8 @@ type Candidate = {
   createdAt: string;
   documentsReady: boolean;
   note: string;
+  nextStepDueAt: string | null;
+  lastContactedAt: string | null;
 };
 type AppRole = "super_admin" | "operator" | "viewer";
 type AuthUser = { id: string; email: string; role: AppRole | null };
@@ -191,6 +195,8 @@ function HaileApp() {
   const applyAgentOperation = useServerFn(applyHaileAiOperation);
   const checkAgents = useServerFn(checkAutomationAgents);
   const sendDocsReminders = useServerFn(sendMissingDocsWhatsAppReminders);
+  const recordAgent = useServerFn(recordAgentAction);
+  const saveRating = useServerFn(saveCandidateRating);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
   const getSessionRole = useServerFn(getAuthorizedSession);
@@ -772,17 +778,51 @@ function HaileApp() {
             )}
             {activePage === "agents" && (
               <AgentsPage
-                selected={selected}
-                canEdit={canEdit}
+                candidates={candidates}
                 logs={logs}
-                onAi={runAi}
-                onApplyStatus={runAgentStatusUpdate}
+                selectedId={selectedId}
+                onSelectCandidate={setSelectedId}
+                canEdit={canEdit}
                 onCheckConnections={runAgentConnectionCheck}
                 onSendWhatsAppDocsReminders={runWhatsAppDocsReminders}
                 agentStatuses={agentStatuses}
                 isCheckingAgents={isCheckingAgents}
                 isSendingWhatsAppReminders={isSendingWhatsAppReminders}
                 actionStatus={actionStatus}
+                setActionStatus={setActionStatus}
+                onReload={loadLiveData}
+                onRecordAction={async (input) => {
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  return await recordAgent({ data: { ...input, accessToken } });
+                }}
+                onSaveRating={async (input) => {
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  return await saveRating({ data: { ...input, accessToken } });
+                }}
+                onGenerateText={async (mode) => {
+                  if (!selected) return null;
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return null;
+                  const result = await generateText({
+                    data: { accessToken, candidateId: selected.id, mode },
+                  });
+                  return result.text;
+                }}
+                onUpdateStage={async (stage) => {
+                  if (!selected) return { ok: false, message: "אין מועמד נבחר." };
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  const result = await updateStage({
+                    data: { accessToken, id: selected.id, stage },
+                  });
+                  return result;
+                }}
               />
             )}
             {activePage === "reports" && <ReportsPage />}
@@ -1191,47 +1231,71 @@ function CandidatesPage({
   );
 }
 
+type AgentActionInput = {
+  candidateId: string;
+  agentName: "סוכן גיוס" | "Voice Agent" | "CIEL" | "SOL";
+  actionType:
+    | "open_message"
+    | "interview_questions"
+    | "rating"
+    | "status_update"
+    | "reminder"
+    | "follow_up"
+    | "note";
+  content: string;
+  language: "he" | "am" | "ru";
+  followUpRequired?: boolean;
+  followUpAt?: string;
+};
+
+type AgentResult = { ok: boolean; message: string };
+
 function AgentsPage({
-  selected,
-  canEdit,
+  candidates,
   logs,
-  onAi,
-  onApplyStatus,
+  selectedId,
+  onSelectCandidate,
+  canEdit,
   onCheckConnections,
   onSendWhatsAppDocsReminders,
   agentStatuses,
   isCheckingAgents,
   isSendingWhatsAppReminders,
   actionStatus,
+  setActionStatus,
+  onReload,
+  onRecordAction,
+  onSaveRating,
+  onGenerateText,
+  onUpdateStage,
 }: {
-  selected: Candidate | null;
-  canEdit: boolean;
+  candidates: Candidate[];
   logs: LogRow[];
-  onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
-  onApplyStatus: () => void;
+  selectedId: string | null;
+  onSelectCandidate: (id: string) => void;
+  canEdit: boolean;
   onCheckConnections: () => void;
   onSendWhatsAppDocsReminders: () => void;
   agentStatuses: AutomationAgentStatus[];
   isCheckingAgents: boolean;
   isSendingWhatsAppReminders: boolean;
   actionStatus: string;
+  setActionStatus: (text: string) => void;
+  onReload: () => Promise<void> | void;
+  onRecordAction: (input: AgentActionInput) => Promise<AgentResult>;
+  onSaveRating: (input: {
+    candidateId: string;
+    rating: "A" | "B" | "C";
+    note: string;
+  }) => Promise<AgentResult>;
+  onGenerateText: (
+    mode: "candidate_next_step" | "translate_to_hebrew" | "status_template",
+  ) => Promise<string | null>;
+  onUpdateStage: (stage: "Lead" | "Learning" | "Test" | "Placed") => Promise<AgentResult>;
 }) {
-  const agents = [
-    { name: "סוכן גיוס", icon: Bot, description: "מסנן לידים ומנהל שיחה ראשונית", tone: "primary" },
-    {
-      name: "Voice Agent",
-      icon: Mic,
-      description: "מבצע ראיון קולי ודירוג A/B/C",
-      tone: "success",
-    },
-    { name: "CIEL", icon: Activity, description: "מנטר לידים, פעולות ודוחות", tone: "intel" },
-    {
-      name: "SOL",
-      icon: CalendarClock,
-      description: "יומן, מיילים ותזכורות לבני",
-      tone: "warning",
-    },
-  ];
+  const selected = candidates.find((c) => c.id === selectedId) ?? null;
+  const candidateLogs = selected ? logs.filter((l) => l.candidate_id === selected.id) : [];
+
   return (
     <div className="space-y-4">
       <Panel
@@ -1243,6 +1307,29 @@ function AgentsPage({
           </Button>
         }
       >
+        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <label className="block text-sm">
+            <span className="mb-1 block font-bold">בחר מועמד פעיל לכל הסוכנים</span>
+            <select
+              value={selectedId ?? ""}
+              onChange={(e) => onSelectCandidate(e.target.value)}
+              className="min-h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
+            >
+              <option value="">— בחר מועמד —</option>
+              {candidates.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {stageLabels[c.stage] ?? c.stage} · {c.city} · {c.language}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selected && (
+            <div className="rounded-md border border-success/40 bg-success/10 px-3 py-2 text-xs text-success">
+              מחובר: {selected.name} · {stageLabels[selected.stage] ?? selected.stage} ·{" "}
+              {selected.city} · {selected.language}
+            </div>
+          )}
+        </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(agentStatuses.length ? agentStatuses : defaultAgentStatuses()).map((status) => (
             <div
@@ -1268,27 +1355,601 @@ function AgentsPage({
         </Button>
         <p className="mt-3 text-sm text-muted-foreground">{actionStatus}</p>
       </Panel>
-      <div className="grid gap-4 md:grid-cols-2">
-        {agents.map((agent) => (
-          <AgentCard
-            key={agent.name}
-            {...agent}
-            isConnected={Boolean(selected)}
-            activityCount={logs.length}
-            onPrimaryAction={
-              selected
-                ? agent.name === "CIEL"
-                  ? onApplyStatus
-                  : () => onAi("candidate_next_step")
-                : undefined
-            }
-            primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
-            selectedName={selected?.name ?? null}
-            statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
-          />
-        ))}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RecruiterAgentPanel
+          selected={selected}
+          canEdit={canEdit}
+          candidateLogs={candidateLogs}
+          onRecordAction={onRecordAction}
+          onGenerateText={onGenerateText}
+          onUpdateStage={onUpdateStage}
+          onReload={onReload}
+          setActionStatus={setActionStatus}
+        />
+        <VoiceAgentPanel
+          selected={selected}
+          canEdit={canEdit}
+          onRecordAction={onRecordAction}
+          onSaveRating={onSaveRating}
+          onReload={onReload}
+          setActionStatus={setActionStatus}
+        />
+        <CielAgentPanel
+          selected={selected}
+          canEdit={canEdit}
+          candidates={candidates}
+          candidateLogs={candidateLogs}
+          onRecordAction={onRecordAction}
+          onUpdateStage={onUpdateStage}
+          onReload={onReload}
+          setActionStatus={setActionStatus}
+        />
+        <SolAgentPanel
+          selected={selected}
+          canEdit={canEdit}
+          candidates={candidates}
+          logs={logs}
+          onRecordAction={onRecordAction}
+          onReload={onReload}
+          setActionStatus={setActionStatus}
+        />
       </div>
     </div>
+  );
+}
+
+type SubAgentProps = {
+  selected: Candidate | null;
+  canEdit: boolean;
+  onRecordAction: (input: AgentActionInput) => Promise<AgentResult>;
+  onReload: () => Promise<void> | void;
+  setActionStatus: (text: string) => void;
+};
+
+function AgentShell({
+  name,
+  icon: Icon,
+  description,
+  tone,
+  selected,
+  children,
+}: {
+  name: string;
+  icon: typeof Bot;
+  description: string;
+  tone: "primary" | "success" | "intel" | "warning";
+  selected: Candidate | null;
+  children: ReactNode;
+}) {
+  const iconTone =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "intel"
+          ? "text-intel"
+          : "text-primary";
+  const isConnected = Boolean(selected);
+  return (
+    <article className="glass-panel rounded-lg p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-md bg-surface-strong">
+            <Icon className={`h-5 w-5 ${iconTone}`} />
+          </div>
+          <div>
+            <h3 className="text-xl font-black">{name}</h3>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <span
+          className={`flex items-center gap-2 rounded-sm px-2 py-1 text-xs ${
+            isConnected ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted-foreground"}`}
+          />
+          {isConnected ? "מחובר" : "לא מחובר"}
+        </span>
+      </div>
+      {selected ? (
+        <div className="mb-3 rounded-md border border-border bg-surface p-3 text-xs text-muted-foreground">
+          <strong className="text-foreground">{selected.name}</strong> ·{" "}
+          {stageLabels[selected.stage] ?? selected.stage} · {selected.city} · {selected.language}
+        </div>
+      ) : (
+        <div className="mb-3 rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+          ממתין לבחירת מועמד למעלה.
+        </div>
+      )}
+      {children}
+    </article>
+  );
+}
+
+function RecruiterAgentPanel({
+  selected,
+  canEdit,
+  candidateLogs,
+  onRecordAction,
+  onGenerateText,
+  onUpdateStage,
+  onReload,
+  setActionStatus,
+}: SubAgentProps & {
+  candidateLogs: LogRow[];
+  onGenerateText: (
+    mode: "candidate_next_step" | "translate_to_hebrew" | "status_template",
+  ) => Promise<string | null>;
+  onUpdateStage: (stage: "Lead" | "Learning" | "Test" | "Placed") => Promise<AgentResult>;
+}) {
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<"Lead" | "Learning" | "Test" | "Placed">("Lead");
+
+  useEffect(() => {
+    if (selected) setStage(selected.stage as "Lead" | "Learning" | "Test" | "Placed");
+  }, [selected?.id]);
+
+  const generate = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const text = await onGenerateText("status_template");
+      if (text) setMessage(text);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const send = async () => {
+    if (!selected || !message.trim()) return;
+    setBusy(true);
+    try {
+      const res = await onRecordAction({
+        candidateId: selected.id,
+        agentName: "סוכן גיוס",
+        actionType: "open_message",
+        content: message.trim(),
+        language: selected.langCode,
+      });
+      setActionStatus(res.message);
+      if (res.ok) {
+        setMessage("");
+        await onReload();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateStage = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const res = await onUpdateStage(stage);
+      setActionStatus(res.message);
+      if (res.ok) {
+        await onRecordAction({
+          candidateId: selected.id,
+          agentName: "סוכן גיוס",
+          actionType: "status_update",
+          content: `סוכן הגיוס עדכן את שלב המועמד ל־${stageLabels[stage] ?? stage}.`,
+          language: "he",
+        });
+        await onReload();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AgentShell
+      name="סוכן גיוס"
+      icon={Bot}
+      description="טוען פרופיל, מנסח הודעת פתיחה בשפת המועמד ומעדכן שלב"
+      tone="primary"
+      selected={selected}
+    >
+      <div className="space-y-3">
+        <Button
+          variant="command"
+          onClick={generate}
+          disabled={!selected || busy}
+          className="w-full"
+        >
+          <Languages className="h-4 w-4" /> צור הודעת פתיחה ב{selected?.language ?? "שפת המועמד"}
+        </Button>
+        <textarea
+          className="min-h-[110px] w-full rounded-md border border-border bg-background p-2 text-sm"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="ההודעה שתישלח למועמד תופיע כאן..."
+        />
+        <div className="flex gap-2">
+          <select
+            value={stage}
+            onChange={(e) =>
+              setStage(e.target.value as "Lead" | "Learning" | "Test" | "Placed")
+            }
+            className="min-h-10 flex-1 rounded-md border border-border bg-background px-2 text-sm"
+            disabled={!selected}
+          >
+            {(["Lead", "Learning", "Test", "Placed"] as const).map((s) => (
+              <option key={s} value={s}>
+                {stageLabels[s]}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="tactical"
+            onClick={updateStage}
+            disabled={!selected || !canEdit || busy}
+          >
+            עדכן שלב
+          </Button>
+        </div>
+        <Button
+          variant="intel"
+          onClick={send}
+          disabled={!selected || !canEdit || busy || !message.trim()}
+          className="w-full"
+        >
+          <Save className="h-4 w-4" /> שמור הודעה ביומן הפעולות
+        </Button>
+        <div className="text-xs text-muted-foreground">
+          פעולות אחרונות: {candidateLogs.length}
+        </div>
+      </div>
+    </AgentShell>
+  );
+}
+
+function VoiceAgentPanel({
+  selected,
+  canEdit,
+  onRecordAction,
+  onSaveRating,
+  onReload,
+  setActionStatus,
+}: SubAgentProps & {
+  onSaveRating: (input: {
+    candidateId: string;
+    rating: "A" | "B" | "C";
+    note: string;
+  }) => Promise<AgentResult>;
+}) {
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [rating, setRating] = useState<"A" | "B" | "C">("A");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const buildQuestions = () => {
+    if (!selected) return;
+    const q = [
+      `שלום ${selected.name}, האם תוכל/י לעבוד 5 ימים בשבוע ב${selected.city}?`,
+      `מה הניסיון שלך בנהיגה מסחרית? סטטוס רישיון נוכחי: ${selected.licenseStatus}.`,
+      `האם המסמכים (ת.ז + טופס ירוק) זמינים? סטטוס נוכחי: ${selected.documentsReady ? "מוכן" : "חסר"}.`,
+      "מתי תוכל/י להתחיל הכשרה?",
+    ];
+    setQuestions(q);
+    setActionStatus("שאלות סינון נוצרו לפי פרופיל המועמד.");
+  };
+
+  const logQuestions = async () => {
+    if (!selected || !questions.length) return;
+    setBusy(true);
+    try {
+      const res = await onRecordAction({
+        candidateId: selected.id,
+        agentName: "Voice Agent",
+        actionType: "interview_questions",
+        content: questions.map((q, i) => `${i + 1}. ${q}`).join("\n"),
+        language: selected.langCode,
+      });
+      setActionStatus(res.message);
+      if (res.ok) await onReload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!selected || !note.trim()) return;
+    setBusy(true);
+    try {
+      const res = await onSaveRating({
+        candidateId: selected.id,
+        rating,
+        note: note.trim(),
+      });
+      setActionStatus(res.message);
+      if (res.ok) {
+        setNote("");
+        await onReload();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AgentShell
+      name="Voice Agent"
+      icon={Mic}
+      description="שאלות סינון, ראיון קולי ודירוג A/B/C נשמר על המועמד"
+      tone="success"
+      selected={selected}
+    >
+      <div className="space-y-3">
+        <Button variant="command" onClick={buildQuestions} disabled={!selected} className="w-full">
+          <Mic className="h-4 w-4" /> צור שאלות ראיון לפי פרופיל
+        </Button>
+        {questions.length > 0 && (
+          <ol className="list-decimal space-y-1 rounded-md border border-border bg-surface p-3 pr-6 text-xs text-muted-foreground">
+            {questions.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ol>
+        )}
+        <Button
+          variant="tactical"
+          onClick={logQuestions}
+          disabled={!selected || !canEdit || !questions.length || busy}
+          className="w-full"
+        >
+          שמור שאלות ביומן
+        </Button>
+        <div className="rounded-md border border-border bg-surface p-3">
+          <div className="mb-2 text-xs font-bold">דירוג אחרי הראיון</div>
+          <div className="mb-2 flex gap-2">
+            {(["A", "B", "C"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRating(r)}
+                className={`min-h-9 flex-1 rounded-md border text-sm font-bold ${
+                  rating === r
+                    ? "border-success bg-success text-success-foreground"
+                    : "border-border bg-background text-foreground"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="הערות ראיון..."
+            className="min-h-[70px] w-full rounded-md border border-border bg-background p-2 text-xs"
+          />
+          <Button
+            variant="intel"
+            onClick={submitRating}
+            disabled={!selected || !canEdit || !note.trim() || busy}
+            className="mt-2 w-full"
+          >
+            שמור דירוג {rating} על המועמד
+          </Button>
+        </div>
+        {selected && (
+          <div className="text-xs text-muted-foreground">
+            דירוג נוכחי: {selected.grade} · ציון: {selected.score ?? "—"}
+          </div>
+        )}
+      </div>
+    </AgentShell>
+  );
+}
+
+function CielAgentPanel({
+  selected,
+  canEdit,
+  candidates,
+  candidateLogs,
+  onRecordAction,
+  onUpdateStage,
+  onReload,
+  setActionStatus,
+}: SubAgentProps & {
+  candidates: Candidate[];
+  candidateLogs: LogRow[];
+  onUpdateStage: (stage: "Lead" | "Learning" | "Test" | "Placed") => Promise<AgentResult>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const activeCount = candidates.filter((c) => c.stage !== "Placed").length;
+  const pending = candidateLogs.filter((l) => l.follow_up_required).length;
+
+  const promote = async () => {
+    if (!selected) return;
+    const next: "Lead" | "Learning" | "Test" | "Placed" =
+      selected.stage === "Lead"
+        ? "Learning"
+        : selected.stage === "Learning"
+          ? "Test"
+          : "Placed";
+    setBusy(true);
+    try {
+      const res = await onUpdateStage(next);
+      setActionStatus(res.message);
+      if (res.ok) {
+        await onRecordAction({
+          candidateId: selected.id,
+          agentName: "CIEL",
+          actionType: "status_update",
+          content: `CIEL קידם את ${selected.name} לשלב ${stageLabels[next]}.`,
+          language: "he",
+        });
+        await onReload();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const logCheckIn = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const res = await onRecordAction({
+        candidateId: selected.id,
+        agentName: "CIEL",
+        actionType: "note",
+        content: `בדיקת CIEL: ${selected.name} בשלב ${stageLabels[selected.stage] ?? selected.stage}, מסמכים ${selected.documentsReady ? "מוכנים" : "חסרים"}.`,
+        language: "he",
+        followUpRequired: !selected.documentsReady,
+      });
+      setActionStatus(res.message);
+      if (res.ok) await onReload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AgentShell
+      name="CIEL"
+      icon={Activity}
+      description="ניטור לידים פעילים, פעולות ממתינות ועדכוני סטטוס"
+      tone="intel"
+      selected={selected}
+    >
+      <div className="space-y-3">
+        <SettingsGrid
+          items={[
+            `מועמדים פעילים: ${activeCount}`,
+            `פעולות לטיפול עבור המועמד: ${pending}`,
+            `סך לוגים למועמד: ${candidateLogs.length}`,
+          ]}
+        />
+        <Button
+          variant="command"
+          onClick={promote}
+          disabled={!selected || !canEdit || busy}
+          className="w-full"
+        >
+          קדם את המועמד לשלב הבא
+        </Button>
+        <Button
+          variant="tactical"
+          onClick={logCheckIn}
+          disabled={!selected || !canEdit || busy}
+          className="w-full"
+        >
+          רשום ביקורת CIEL ביומן
+        </Button>
+      </div>
+    </AgentShell>
+  );
+}
+
+function SolAgentPanel({
+  selected,
+  canEdit,
+  candidates,
+  logs,
+  onRecordAction,
+  onReload,
+  setActionStatus,
+}: SubAgentProps & {
+  candidates: Candidate[];
+  logs: LogRow[];
+}) {
+  const [date, setDate] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const followUps = candidates
+    .filter((c) => c.nextStepDueAt)
+    .sort(
+      (a, b) =>
+        new Date(a.nextStepDueAt ?? 0).getTime() - new Date(b.nextStepDueAt ?? 0).getTime(),
+    )
+    .slice(0, 5);
+  const pendingLogs = logs.filter((l) => l.follow_up_required).length;
+
+  const createReminder = async () => {
+    if (!selected || !text.trim() || !date) return;
+    setBusy(true);
+    try {
+      const res = await onRecordAction({
+        candidateId: selected.id,
+        agentName: "SOL",
+        actionType: "reminder",
+        content: text.trim(),
+        language: "he",
+        followUpRequired: true,
+        followUpAt: new Date(date).toISOString(),
+      });
+      setActionStatus(res.message);
+      if (res.ok) {
+        setText("");
+        setDate("");
+        await onReload();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AgentShell
+      name="SOL"
+      icon={CalendarClock}
+      description="תזכורות, מעקבים ופעולות ממתינות"
+      tone="warning"
+      selected={selected}
+    >
+      <div className="space-y-3">
+        <SettingsGrid
+          items={[
+            `מועמדים עם תזכורת קרובה: ${followUps.length}`,
+            `פעולות ממתינות (כלל המערכת): ${pendingLogs}`,
+            selected?.nextStepDueAt
+              ? `תזכורת קיימת: ${formatDate(selected.nextStepDueAt)}`
+              : "לא הוגדרה תזכורת למועמד הנבחר",
+          ]}
+        />
+        {followUps.length > 0 && (
+          <div className="rounded-md border border-border bg-surface p-3 text-xs">
+            <div className="mb-1 font-bold">מעקבים קרובים</div>
+            <ul className="space-y-1 text-muted-foreground">
+              {followUps.map((c) => (
+                <li key={c.id}>
+                  {formatDate(c.nextStepDueAt!)} — {c.name} ({stageLabels[c.stage] ?? c.stage})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <input
+          type="datetime-local"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="min-h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
+          disabled={!selected}
+        />
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="תיאור התזכורת..."
+          className="min-h-[80px] w-full rounded-md border border-border bg-background p-2 text-sm"
+          disabled={!selected}
+        />
+        <Button
+          variant="command"
+          onClick={createReminder}
+          disabled={!selected || !canEdit || !date || !text.trim() || busy}
+          className="w-full"
+        >
+          <Bell className="h-4 w-4" /> צור תזכורת ושמור ביומן
+        </Button>
+      </div>
+    </AgentShell>
   );
 }
 
@@ -2040,6 +2701,7 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     age: row.age,
     city: String(row.city),
     language: languageLabel(row.preferred_language),
+    langCode: (row.preferred_language === "he" || row.preferred_language === "ru" ? row.preferred_language : "am") as "he" | "am" | "ru",
     licenseStatus: row.license_status,
     stage: row.stage,
     grade: gradeFromScore(score),
@@ -2047,6 +2709,8 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     createdAt: row.created_at,
     documentsReady,
     note: profile.note,
+    nextStepDueAt: row.next_step_due_at,
+    lastContactedAt: row.last_contacted_at,
   };
 }
 
