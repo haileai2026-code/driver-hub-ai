@@ -64,7 +64,7 @@ import {
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
-import { CITY_OPTIONS, type CityOption, normalizeCityValue } from "@/lib/cities";
+import { CITY_OPTIONS, CITY_LABELS_HE, cityLabel, type CityOption, normalizeCityValue } from "@/lib/cities";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -299,7 +299,8 @@ function HaileApp() {
         !term ||
         candidate.name.includes(term) ||
         candidate.phone.includes(term) ||
-        candidate.city.includes(term);
+        candidate.city.includes(term) ||
+        cityLabel(candidate.city).includes(term);
       const matchesStatus = statusFilter === "הכל" || stageLabels[candidate.stage] === statusFilter;
       return matchesTerm && matchesStatus;
     });
@@ -668,7 +669,7 @@ function HaileApp() {
     const rows = candidates.map((candidate) => ({
       שם: candidate.name,
       טלפון: formatPhone(candidate.phone),
-      עיר: candidate.city,
+      עיר: cityLabel(candidate.city),
       שפה: candidate.language,
       סטטוס: stageLabels[candidate.stage] ?? candidate.stage,
       רישיון: candidate.licenseStatus,
@@ -1086,6 +1087,8 @@ function SmallInput({
   );
 }
 
+type SmallSelectOption = string | { value: string; label: string };
+
 function SmallSelect({
   label,
   value,
@@ -1094,7 +1097,7 @@ function SmallSelect({
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: SmallSelectOption[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -1105,11 +1108,15 @@ function SmallSelect({
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const v = typeof option === "string" ? option : option.value;
+          const l = typeof option === "string" ? option : option.label;
+          return (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
@@ -1444,7 +1451,7 @@ function AgentsPage({
               <option value="">— בחר מועמד —</option>
               {candidates.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} · {stageLabels[c.stage] ?? c.stage} · {c.city} · {c.language}
+                  {c.name} · {stageLabels[c.stage] ?? c.stage} · {cityLabel(c.city)} · {c.language}
                 </option>
               ))}
             </select>
@@ -1452,7 +1459,7 @@ function AgentsPage({
           {selected && (
             <div className="rounded-md border border-success/40 bg-success/10 px-3 py-2 text-xs text-success">
               מחובר: {selected.name} · {stageLabels[selected.stage] ?? selected.stage} ·{" "}
-              {selected.city} · {selected.language}
+              {cityLabel(selected.city)} · {selected.language}
             </div>
           )}
         </div>
@@ -1583,7 +1590,7 @@ function AgentShell({
       {selected ? (
         <div className="mb-3 rounded-md border border-border bg-surface p-3 text-xs text-muted-foreground">
           <strong className="text-foreground">{selected.name}</strong> ·{" "}
-          {stageLabels[selected.stage] ?? selected.stage} · {selected.city} · {selected.language}
+          {stageLabels[selected.stage] ?? selected.stage} · {cityLabel(selected.city)} · {selected.language}
         </div>
       ) : (
         <div className="mb-3 rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
@@ -1756,7 +1763,7 @@ function VoiceAgentPanel({
   const buildQuestions = () => {
     if (!selected) return;
     const q = [
-      `שלום ${selected.name}, האם תוכל/י לעבוד 5 ימים בשבוע ב${selected.city}?`,
+      `שלום ${selected.name}, האם תוכל/י לעבוד 5 ימים בשבוע ב${cityLabel(selected.city)}?`,
       `מה הניסיון שלך בנהיגה מסחרית? סטטוס רישיון נוכחי: ${selected.licenseStatus}.`,
       `האם המסמכים (ת.ז + טופס ירוק) זמינים? סטטוס נוכחי: ${selected.documentsReady ? "מוכן" : "חסר"}.`,
       "מתי תוכל/י להתחיל הכשרה?",
@@ -2134,7 +2141,7 @@ function QuickCandidateForm({
         <SmallSelect
           label="עיר"
           value={form.city}
-          options={[...CITY_OPTIONS]}
+          options={CITY_OPTIONS.map((c) => ({ value: c, label: CITY_LABELS_HE[c] }))}
           onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
         />
         <SmallSelect
@@ -2469,7 +2476,7 @@ function CandidateCard({
           <div>
             <h3 className="font-black">{candidate.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {formatPhone(candidate.phone)} · {candidate.city} · {candidate.language}
+              {formatPhone(candidate.phone)} · {cityLabel(candidate.city)} · {candidate.language}
             </p>
             {lastUpdated && (
               <p className="mt-1 text-xs text-muted-foreground/80">
@@ -2612,7 +2619,7 @@ function CandidateEditPanel({
           >
             {CITY_OPTIONS.map((city) => (
               <option key={city} value={city}>
-                {city}
+                {CITY_LABELS_HE[city]}
               </option>
             ))}
           </select>
@@ -2756,7 +2763,7 @@ function CandidateProfile({
         <div>
           <h3 className="text-2xl font-black">{candidate.name}</h3>
           <p className="text-sm text-muted-foreground">
-            {formatPhone(candidate.phone)} · {candidate.city}
+            {formatPhone(candidate.phone)} · {cityLabel(candidate.city)}
           </p>
         </div>
       </div>
@@ -2829,7 +2836,7 @@ function CandidateTable({
             <tr key={candidate.id} className="border-b border-border/70">
               <td className="p-3 font-bold">{candidate.name}</td>
               <td className="p-3">{formatPhone(candidate.phone)}</td>
-              <td className="p-3">{candidate.city}</td>
+              <td className="p-3">{cityLabel(candidate.city)}</td>
               <td className="p-3">{candidate.score ?? "—"}</td>
               <td className="p-3">
                 <GradeBadge grade={candidate.grade} />
