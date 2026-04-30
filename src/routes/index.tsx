@@ -1185,6 +1185,16 @@ function CandidatesPage({
           />
         }
       >
+        {(importStatus || importRows > 0) ? (
+          <div className="mb-4 space-y-1 rounded-md border border-border bg-surface p-3 text-xs">
+            <p className="text-muted-foreground">{importStatus}</p>
+            {importRows > 0 && (
+              <p className="font-medium text-foreground">
+                תצוגה מקדימה: {importRows} שורות מוכנות. לחץ "ייבא" לשמירה.
+              </p>
+            )}
+          </div>
+        ) : null}
         <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <label className="flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-3">
             <Search className="h-4 w-4 text-muted-foreground" />
