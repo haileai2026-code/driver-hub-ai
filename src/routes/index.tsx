@@ -109,8 +109,10 @@ type Candidate = {
   grade: "A" | "B" | "C" | "—";
   score: number | null;
   createdAt: string;
+  updatedAt: string | null;
   documentsReady: boolean;
   note: string;
+  partner: string | null;
   nextStepDueAt: string | null;
   lastContactedAt: string | null;
 };
@@ -130,6 +132,34 @@ type CandidateForm = {
   greenForm: boolean;
 };
 type AuthMode = "login" | "firstAdmin";
+
+type PartnerOption = "Egged" | "Afikim" | "Other";
+type CandidateInlinePatch = {
+  name: string;
+  phone: string;
+  age: string;
+  city: CityOption;
+  stage: "Lead" | "Learning" | "Test" | "Placed";
+  license: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
+  language: "he" | "am" | "ru";
+  partner: PartnerOption | null;
+  notes: string;
+};
+const PARTNER_OPTIONS: PartnerOption[] = ["Egged", "Afikim", "Other"];
+const LICENSE_OPTIONS = ["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const;
+const LICENSE_LABELS: Record<(typeof LICENSE_OPTIONS)[number], string> = {
+  "Not Started": "טרם החל",
+  Learning: "לומד",
+  "Theory Ready": "מוכן לתאוריה",
+  "Test Scheduled": "טסט מתוזמן",
+  Licensed: "מורשה",
+};
+const STAGE_OPTIONS = ["Lead", "Learning", "Test", "Placed"] as const;
+const LANGUAGE_OPTIONS: Array<{ value: "he" | "am" | "ru"; label: string }> = [
+  { value: "he", label: "עברית" },
+  { value: "am", label: "אמהרית" },
+  { value: "ru", label: "רוסית" },
+];
 
 const navItems: Array<{
   key: PageKey;
@@ -563,6 +593,60 @@ function HaileApp() {
     }
   };
 
+  const inlineEditCandidate = async (
+    candidate: Candidate,
+    patch: CandidateInlinePatch,
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!canEdit) return { ok: false, message: "הרשאת VIEWER מאפשרת צפייה בלבד." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+
+    const result = await editCandidateRow({
+      data: {
+        accessToken,
+        id: candidate.id,
+        name: patch.name.trim() || candidate.name,
+        phone: patch.phone.replace(/[^+\d]/g, "") || candidate.phone,
+        age: patch.age ? Number(patch.age) : null,
+        city: patch.city,
+        stage: patch.stage,
+        license: patch.license,
+        notes: patch.notes ? patch.notes : null,
+        language: patch.language,
+        partner: patch.partner,
+      },
+    });
+    setActionStatus(result.ok ? result.message : `שמירת מועמד נכשלה: ${result.message}`);
+    if (result.ok) await loadLiveData();
+    return { ok: result.ok, message: result.message };
+  };
+
+  const inlineAddNote = async (
+    candidate: Candidate,
+    noteText: string,
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!canEdit) return { ok: false, message: "הרשאת VIEWER מאפשרת צפייה בלבד." };
+    const trimmed = noteText.trim();
+    if (!trimmed) return { ok: false, message: "אין הערה לשמירה." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+    const result = await recordAgent({
+      data: {
+        accessToken,
+        candidateId: candidate.id,
+        agentName: "סוכן גיוס",
+        actionType: "note",
+        content: trimmed,
+        language: candidate.langCode,
+      },
+    });
+    setActionStatus(result.ok ? result.message : `שמירת הערה נכשלה: ${result.message}`);
+    if (result.ok) await loadLiveData();
+    return { ok: result.ok, message: result.message };
+  };
+
   const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
     if (!selected) return;
     if (!canEdit) {
@@ -797,6 +881,8 @@ function HaileApp() {
                 isAiLoading={isAiLoading}
                 canEdit={canEdit}
                 isEditing={Boolean(editingId)}
+                onInlineSave={inlineEditCandidate}
+                onInlineNote={inlineAddNote}
               />
             )}
             {activePage === "agents" && (
@@ -1143,6 +1229,8 @@ function CandidatesPage({
   isAiLoading,
   canEdit,
   isEditing,
+  onInlineSave,
+  onInlineNote,
 }: {
   candidates: Candidate[];
   selected: Candidate | null;
@@ -1169,6 +1257,8 @@ function CandidatesPage({
   isAiLoading: boolean;
   canEdit: boolean;
   isEditing: boolean;
+  onInlineSave: (candidate: Candidate, patch: CandidateInlinePatch) => Promise<{ ok: boolean; message: string }>;
+  onInlineNote: (candidate: Candidate, note: string) => Promise<{ ok: boolean; message: string }>;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -1226,6 +1316,9 @@ function CandidatesPage({
                 candidate={candidate}
                 active={selected?.id === candidate.id}
                 onClick={() => onSelect(candidate.id)}
+                canEdit={canEdit}
+                onInlineSave={onInlineSave}
+                onInlineNote={onInlineNote}
               />
             ))}
           </div>
@@ -2343,31 +2436,297 @@ function CandidateCard({
   candidate,
   active,
   onClick,
+  canEdit,
+  onInlineSave,
+  onInlineNote,
 }: {
   candidate: Candidate;
   active: boolean;
   onClick: () => void;
+  canEdit: boolean;
+  onInlineSave: (candidate: Candidate, patch: CandidateInlinePatch) => Promise<{ ok: boolean; message: string }>;
+  onInlineNote: (candidate: Candidate, note: string) => Promise<{ ok: boolean; message: string }>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const lastUpdated = candidate.updatedAt ?? candidate.createdAt;
+
+  const handleHeaderClick = () => {
+    onClick();
+    setExpanded((prev) => !prev);
+  };
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`grid gap-3 rounded-lg border p-4 text-right transition hover:-translate-y-0.5 md:grid-cols-[1fr_auto] ${active ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
+    <div
+      className={`rounded-lg border text-right transition ${active ? "border-primary bg-primary/10" : "border-border bg-surface"}`}
     >
-      <div className="flex gap-3">
-        <Initials name={candidate.name} />
-        <div>
-          <h3 className="font-black">{candidate.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            {formatPhone(candidate.phone)} · {candidate.city} · {candidate.language}
-          </p>
+      <button
+        type="button"
+        onClick={handleHeaderClick}
+        className="grid w-full gap-3 p-4 text-right hover:-translate-y-0.5 md:grid-cols-[1fr_auto]"
+      >
+        <div className="flex gap-3">
+          <Initials name={candidate.name} />
+          <div>
+            <h3 className="font-black">{candidate.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              {formatPhone(candidate.phone)} · {candidate.city} · {candidate.language}
+            </p>
+            {lastUpdated && (
+              <p className="mt-1 text-xs text-muted-foreground/80">
+                עודכן לאחרונה: {formatDate(lastUpdated)}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge text={stageLabels[candidate.stage] ?? candidate.stage} />
+          <GradeBadge grade={candidate.grade} />
+        </div>
+      </button>
+      {expanded && (
+        <CandidateEditPanel
+          candidate={candidate}
+          canEdit={canEdit}
+          onClose={() => setExpanded(false)}
+          onInlineSave={onInlineSave}
+          onInlineNote={onInlineNote}
+        />
+      )}
+    </div>
+  );
+}
+
+function CandidateEditPanel({
+  candidate,
+  canEdit,
+  onClose,
+  onInlineSave,
+  onInlineNote,
+}: {
+  candidate: Candidate;
+  canEdit: boolean;
+  onClose: () => void;
+  onInlineSave: (candidate: Candidate, patch: CandidateInlinePatch) => Promise<{ ok: boolean; message: string }>;
+  onInlineNote: (candidate: Candidate, note: string) => Promise<{ ok: boolean; message: string }>;
+}) {
+  const initialCity =
+    (normalizeCityValue(String(candidate.city ?? "")) as CityOption | undefined) ??
+    (CITY_OPTIONS.includes(candidate.city as CityOption) ? (candidate.city as CityOption) : "Other");
+  const initialLicense = (LICENSE_OPTIONS as readonly string[]).includes(candidate.licenseStatus)
+    ? (candidate.licenseStatus as CandidateInlinePatch["license"])
+    : "Not Started";
+  const initialStage = (STAGE_OPTIONS as readonly string[]).includes(candidate.stage)
+    ? (candidate.stage as CandidateInlinePatch["stage"])
+    : "Lead";
+  const initialPartner: PartnerOption | null =
+    candidate.partner && (PARTNER_OPTIONS as string[]).includes(candidate.partner)
+      ? (candidate.partner as PartnerOption)
+      : candidate.partner
+        ? "Other"
+        : null;
+
+  const [patch, setPatch] = useState<CandidateInlinePatch>({
+    name: candidate.name,
+    phone: candidate.phone,
+    age: candidate.age ? String(candidate.age) : "",
+    city: initialCity,
+    stage: initialStage,
+    license: initialLicense,
+    language: candidate.langCode,
+    partner: initialPartner,
+    notes: candidate.note,
+  });
+  const [noteDraft, setNoteDraft] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isNoting, setIsNoting] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const update = <K extends keyof CandidateInlinePatch>(key: K, value: CandidateInlinePatch[K]) =>
+    setPatch((prev) => ({ ...prev, [key]: value }));
+
+  const handleSave = async () => {
+    if (!canEdit) return;
+    setIsSaving(true);
+    setStatus(null);
+    const result = await onInlineSave(candidate, patch);
+    setStatus(result.message);
+    setIsSaving(false);
+  };
+
+  const handleAddNote = async () => {
+    if (!canEdit) return;
+    setIsNoting(true);
+    setStatus(null);
+    const result = await onInlineNote(candidate, noteDraft);
+    setStatus(result.message);
+    if (result.ok) setNoteDraft("");
+    setIsNoting(false);
+  };
+
+  const fieldClass =
+    "min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary";
+  const labelClass = "grid gap-1 text-xs font-medium text-muted-foreground";
+
+  return (
+    <div className="grid gap-3 border-t border-border bg-background/50 p-4 text-right">
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className={labelClass}>
+          שם מלא
+          <input
+            className={fieldClass}
+            value={patch.name}
+            onChange={(e) => update("name", e.target.value)}
+            disabled={!canEdit}
+            maxLength={160}
+          />
+        </label>
+        <label className={labelClass}>
+          טלפון
+          <input
+            className={fieldClass}
+            value={patch.phone}
+            onChange={(e) => update("phone", e.target.value)}
+            disabled={!canEdit}
+            maxLength={30}
+            inputMode="tel"
+          />
+        </label>
+        <label className={labelClass}>
+          גיל
+          <input
+            className={fieldClass}
+            value={patch.age}
+            onChange={(e) => update("age", e.target.value.replace(/[^\d]/g, ""))}
+            disabled={!canEdit}
+            inputMode="numeric"
+            maxLength={3}
+          />
+        </label>
+        <label className={labelClass}>
+          עיר
+          <select
+            className={fieldClass}
+            value={patch.city}
+            onChange={(e) => update("city", e.target.value as CityOption)}
+            disabled={!canEdit}
+          >
+            {CITY_OPTIONS.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          שלב
+          <select
+            className={fieldClass}
+            value={patch.stage}
+            onChange={(e) => update("stage", e.target.value as CandidateInlinePatch["stage"])}
+            disabled={!canEdit}
+          >
+            {STAGE_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {stageLabels[s] ?? s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          רישיון
+          <select
+            className={fieldClass}
+            value={patch.license}
+            onChange={(e) => update("license", e.target.value as CandidateInlinePatch["license"])}
+            disabled={!canEdit}
+          >
+            {LICENSE_OPTIONS.map((l) => (
+              <option key={l} value={l}>
+                {LICENSE_LABELS[l]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          שותף
+          <select
+            className={fieldClass}
+            value={patch.partner ?? ""}
+            onChange={(e) => update("partner", (e.target.value || null) as PartnerOption | null)}
+            disabled={!canEdit}
+          >
+            <option value="">— ללא —</option>
+            {PARTNER_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          שפה מועדפת
+          <select
+            className={fieldClass}
+            value={patch.language}
+            onChange={(e) => update("language", e.target.value as "he" | "am" | "ru")}
+            disabled={!canEdit}
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className={labelClass}>
+        הערות
+        <textarea
+          className={`${fieldClass} min-h-20 py-2`}
+          value={patch.notes}
+          onChange={(e) => update("notes", e.target.value)}
+          disabled={!canEdit}
+          maxLength={2000}
+          rows={3}
+        />
+      </label>
+      <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+        <textarea
+          placeholder="הוסף הערה ליומן (תיכתב כלוג חדש)"
+          className={`${fieldClass} min-h-12 py-2`}
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          disabled={!canEdit}
+          maxLength={4000}
+          rows={2}
+        />
+        <Button
+          variant="tactical"
+          onClick={handleAddNote}
+          disabled={!canEdit || isNoting || !noteDraft.trim()}
+        >
+          <FileText className="h-4 w-4" /> {isNoting ? "שומר..." : "הוסף הערה"}
+        </Button>
+      </div>
+      {status && <p className="text-xs text-muted-foreground">{status}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          עודכן לאחרונה: {formatDate(candidate.updatedAt ?? candidate.createdAt)}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            סגור
+          </Button>
+          <Button
+            variant="command"
+            onClick={handleSave}
+            disabled={!canEdit || isSaving}
+          >
+            <Save className="h-4 w-4" /> {isSaving ? "שומר..." : "שמור"}
+          </Button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge text={stageLabels[candidate.stage] ?? candidate.stage} />
-        <GradeBadge grade={candidate.grade} />
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -2766,8 +3125,10 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     grade: gradeFromScore(score),
     score,
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
     documentsReady,
     note: decodeHebrew(profile.note),
+    partner: row.assigned_to ?? null,
     nextStepDueAt: row.next_step_due_at,
     lastContactedAt: row.last_contacted_at,
   };
