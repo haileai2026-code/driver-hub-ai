@@ -98,7 +98,7 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
   const noteHe = read(row, headerMap.notesHe);
   const noteAm = read(row, headerMap.notesAm);
   const noteRu = read(row, headerMap.notesRu);
-  const name = nameHe || nameAm || nameRu || phone;
+  const name = nameHe || nameAm || nameRu;
 
   const partner = read(row, headerMap.partner);
   return {
