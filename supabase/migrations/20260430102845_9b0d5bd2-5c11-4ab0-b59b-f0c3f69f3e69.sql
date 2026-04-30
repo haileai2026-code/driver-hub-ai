@@ -1,0 +1,3 @@
+ALTER TABLE public.candidates
+  ALTER COLUMN phone DROP NOT NULL,
+  ALTER COLUMN city DROP NOT NULL;

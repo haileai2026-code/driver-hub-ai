@@ -56,7 +56,7 @@ export type Database = {
         Row: {
           age: number | null
           assigned_to: string | null
-          city: Database["public"]["Enums"]["candidate_city"]
+          city: Database["public"]["Enums"]["candidate_city"] | null
           created_at: string
           created_by: string | null
           documents: Json
@@ -69,7 +69,7 @@ export type Database = {
           name: string
           next_step_due_at: string | null
           notes: string | null
-          phone: string
+          phone: string | null
           preferred_language: Database["public"]["Enums"]["preferred_language"]
           stage: string
           updated_at: string
@@ -77,7 +77,7 @@ export type Database = {
         Insert: {
           age?: number | null
           assigned_to?: string | null
-          city: Database["public"]["Enums"]["candidate_city"]
+          city?: Database["public"]["Enums"]["candidate_city"] | null
           created_at?: string
           created_by?: string | null
           documents?: Json
@@ -90,7 +90,7 @@ export type Database = {
           name: string
           next_step_due_at?: string | null
           notes?: string | null
-          phone: string
+          phone?: string | null
           preferred_language?: Database["public"]["Enums"]["preferred_language"]
           stage?: string
           updated_at?: string
@@ -98,7 +98,7 @@ export type Database = {
         Update: {
           age?: number | null
           assigned_to?: string | null
-          city?: Database["public"]["Enums"]["candidate_city"]
+          city?: Database["public"]["Enums"]["candidate_city"] | null
           created_at?: string
           created_by?: string | null
           documents?: Json
@@ -111,7 +111,7 @@ export type Database = {
           name?: string
           next_step_due_at?: string | null
           notes?: string | null
-          phone?: string
+          phone?: string | null
           preferred_language?: Database["public"]["Enums"]["preferred_language"]
           stage?: string
           updated_at?: string
