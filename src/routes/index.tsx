@@ -2041,7 +2041,7 @@ function QuickCandidateForm({
         <SmallSelect
           label="עיר"
           value={form.city}
-          options={["Ashkelon", "Kiryat Gat"]}
+          options={[...CITY_OPTIONS]}
           onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
         />
         <SmallSelect
