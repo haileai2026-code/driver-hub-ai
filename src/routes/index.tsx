@@ -565,7 +565,60 @@ function HaileApp() {
     }
   };
 
-  const updateSelectedStage = async (stage: CandidateForm["stage"]) => {
+  const inlineEditCandidate = async (
+    candidate: Candidate,
+    patch: CandidateInlinePatch,
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!canEdit) return { ok: false, message: "הרשאת VIEWER מאפשרת צפייה בלבד." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+
+    const result = await editCandidateRow({
+      data: {
+        accessToken,
+        id: candidate.id,
+        name: patch.name.trim() || candidate.name,
+        phone: patch.phone.replace(/[^+\d]/g, "") || candidate.phone,
+        age: patch.age ? Number(patch.age) : null,
+        city: patch.city,
+        stage: patch.stage,
+        license: patch.license,
+        notes: patch.notes ? patch.notes : null,
+        language: patch.language,
+        partner: patch.partner,
+      },
+    });
+    setActionStatus(result.ok ? result.message : `שמירת מועמד נכשלה: ${result.message}`);
+    if (result.ok) await loadLiveData();
+    return { ok: result.ok, message: result.message };
+  };
+
+  const inlineAddNote = async (
+    candidate: Candidate,
+    noteText: string,
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!canEdit) return { ok: false, message: "הרשאת VIEWER מאפשרת צפייה בלבד." };
+    const trimmed = noteText.trim();
+    if (!trimmed) return { ok: false, message: "אין הערה לשמירה." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+    const result = await recordAgent({
+      data: {
+        accessToken,
+        candidateId: candidate.id,
+        agentName: "סוכן גיוס",
+        actionType: "note",
+        content: trimmed,
+        language: candidate.langCode,
+      },
+    });
+    setActionStatus(result.ok ? result.message : `שמירת הערה נכשלה: ${result.message}`);
+    if (result.ok) await loadLiveData();
+    return { ok: result.ok, message: result.message };
+  };
+
     if (!selected) return;
     if (!canEdit) {
       setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
