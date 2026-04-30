@@ -2768,8 +2768,10 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     grade: gradeFromScore(score),
     score,
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
     documentsReady,
     note: decodeHebrew(profile.note),
+    partner: row.assigned_to ?? null,
     nextStepDueAt: row.next_step_due_at,
     lastContactedAt: row.last_contacted_at,
   };
