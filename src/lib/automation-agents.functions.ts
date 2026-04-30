@@ -22,7 +22,8 @@ const TWILIO_GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
 
 async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
   const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
-  if (authError || !userData.user) return { ok: false as const, message: "יש להתחבר עם משתמש מורשה." };
+  if (authError || !userData.user)
+    return { ok: false as const, message: "יש להתחבר עם משתמש מורשה." };
 
   const { data: roleRow, error: roleError } = await supabaseAdmin
     .from("user_roles")
@@ -57,7 +58,11 @@ function hasMissingDocuments(documents: unknown) {
   return !record.id?.received || !(record.green_form ?? record.green)?.received;
 }
 
-async function verifyConnection(key: string | undefined, label: string, statusKey: AutomationAgentStatus["key"]) {
+async function verifyConnection(
+  key: string | undefined,
+  label: string,
+  statusKey: AutomationAgentStatus["key"],
+) {
   const lovableKey = process.env.LOVABLE_API_KEY;
   if (!lovableKey) return { key: statusKey, label, ready: false, detail: "LOVABLE_API_KEY חסר." };
   if (!key) return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
@@ -70,12 +75,18 @@ async function verifyConnection(key: string | undefined, label: string, statusKe
         "X-Connection-Api-Key": key,
       },
     });
-    const json = (await response.json()) as { outcome?: string; latency_ms?: number; error?: string };
+    const json = (await response.json()) as {
+      outcome?: string;
+      latency_ms?: number;
+      error?: string;
+    };
     return {
       key: statusKey,
       label,
       ready: response.ok && (json.outcome === "verified" || json.outcome === "skipped"),
-      detail: response.ok ? `סטטוס: ${json.outcome ?? "verified"}` : json.error ?? "בדיקת החיבור נכשלה.",
+      detail: response.ok
+        ? `סטטוס: ${json.outcome ?? "verified"}`
+        : (json.error ?? "בדיקת החיבור נכשלה."),
       latencyMs: json.latency_ms,
     };
   } catch {
@@ -87,7 +98,8 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
   .handler(async ({ data }) => {
     const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator", "viewer"]);
-    if (!auth.ok) return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
+    if (!auth.ok)
+      return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
     const statuses = await Promise.all([
       verifyConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
@@ -124,7 +136,12 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
     const twilioKey = process.env.TWILIO_API_KEY;
     const from = twilioFromNumber();
     if (!lovableKey || !twilioKey || !from) {
-      return { ok: false as const, message: "Twilio WhatsApp עדיין לא מחובר במלואו להפעלה.", sent: 0, skipped: 0 };
+      return {
+        ok: false as const,
+        message: "Twilio WhatsApp עדיין לא מחובר במלואו להפעלה.",
+        sent: 0,
+        skipped: 0,
+      };
     }
 
     const { data: candidates, error } = await supabaseAdmin
@@ -151,7 +168,11 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
           "X-Connection-Api-Key": twilioKey,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: normalizeWhatsAppPhone(candidate.phone), From: from, Body: body }),
+        body: new URLSearchParams({
+          To: normalizeWhatsAppPhone(candidate.phone),
+          From: from,
+          Body: body,
+        }),
       });
 
       if (response.ok) {
@@ -165,11 +186,19 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
           source_message: body,
           follow_up_required: true,
         });
-        await supabaseAdmin.from("candidates").update({ last_contacted_at: new Date().toISOString() }).eq("id", candidate.id);
+        await supabaseAdmin
+          .from("candidates")
+          .update({ last_contacted_at: new Date().toISOString() })
+          .eq("id", candidate.id);
       } else {
         skipped += 1;
       }
     }
 
-    return { ok: true as const, message: `נשלחו ${sent} תזכורות WhatsApp. דולגו ${skipped}.`, sent, skipped };
+    return {
+      ok: true as const,
+      message: `נשלחו ${sent} תזכורות WhatsApp. דולגו ${skipped}.`,
+      sent,
+      skipped,
+    };
   });
