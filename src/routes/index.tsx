@@ -2043,6 +2043,7 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     age: row.age,
     city: String(row.city),
     language: languageLabel(row.preferred_language),
+    langCode: (row.preferred_language === "he" || row.preferred_language === "ru" ? row.preferred_language : "am") as "he" | "am" | "ru",
     licenseStatus: row.license_status,
     stage: row.stage,
     grade: gradeFromScore(score),
@@ -2050,6 +2051,8 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     createdAt: row.created_at,
     documentsReady,
     note: profile.note,
+    nextStepDueAt: row.next_step_due_at,
+    lastContactedAt: row.last_contacted_at,
   };
 }
 
