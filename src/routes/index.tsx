@@ -1459,7 +1459,7 @@ function AgentsPage({
           {selected && (
             <div className="rounded-md border border-success/40 bg-success/10 px-3 py-2 text-xs text-success">
               מחובר: {selected.name} · {stageLabels[selected.stage] ?? selected.stage} ·{" "}
-              {selected.city} · {selected.language}
+              {cityLabel(selected.city)} · {selected.language}
             </div>
           )}
         </div>
