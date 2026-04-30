@@ -101,6 +101,7 @@ type Candidate = {
   age: number | null;
   city: string;
   language: string;
+  langCode: "he" | "am" | "ru";
   licenseStatus: string;
   stage: string;
   grade: "A" | "B" | "C" | "—";
@@ -108,6 +109,8 @@ type Candidate = {
   createdAt: string;
   documentsReady: boolean;
   note: string;
+  nextStepDueAt: string | null;
+  lastContactedAt: string | null;
 };
 type AppRole = "super_admin" | "operator" | "viewer";
 type AuthUser = { id: string; email: string; role: AppRole | null };
