@@ -1227,6 +1227,8 @@ function CandidatesPage({
   isAiLoading,
   canEdit,
   isEditing,
+  onInlineSave,
+  onInlineNote,
 }: {
   candidates: Candidate[];
   selected: Candidate | null;
@@ -1253,6 +1255,8 @@ function CandidatesPage({
   isAiLoading: boolean;
   canEdit: boolean;
   isEditing: boolean;
+  onInlineSave: (candidate: Candidate, patch: CandidateInlinePatch) => Promise<{ ok: boolean; message: string }>;
+  onInlineNote: (candidate: Candidate, note: string) => Promise<{ ok: boolean; message: string }>;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
