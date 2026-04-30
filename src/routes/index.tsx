@@ -299,7 +299,8 @@ function HaileApp() {
         !term ||
         candidate.name.includes(term) ||
         candidate.phone.includes(term) ||
-        candidate.city.includes(term);
+        candidate.city.includes(term) ||
+        cityLabel(candidate.city).includes(term);
       const matchesStatus = statusFilter === "הכל" || stageLabels[candidate.stage] === statusFilter;
       return matchesTerm && matchesStatus;
     });
