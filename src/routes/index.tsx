@@ -2722,8 +2722,34 @@ function GradeBadge({ grade }: { grade: Candidate["grade"] }) {
   );
 }
 
+function decodeHebrew(value: string): string {
+  if (!value) return value;
+  // If already contains Hebrew chars, assume correctly decoded.
+  if (/[\u0590-\u05FF]/.test(value)) return value;
+  // Detect mojibake pattern: UTF-8 bytes interpreted as Latin-1/Windows-1252.
+  // Common markers for Hebrew mojibake: "×" (0xD7) followed by another 0x80-0xBF byte
+  // or "Ö" / "×" sequences. Try to repair by re-encoding char codes as bytes
+  // and decoding as UTF-8.
+  if (!/[\u00C0-\u00FF]/.test(value)) return value;
+  try {
+    const bytes = new Uint8Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      const code = value.charCodeAt(i);
+      if (code > 0xff) return value; // not a latin1 sequence, abort
+      bytes[i] = code;
+    }
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    // Only accept the repair if it actually produced Hebrew.
+    if (/[\u0590-\u05FF]/.test(decoded)) return decoded;
+    return value;
+  } catch {
+    return value;
+  }
+}
+
 function normalizeCandidate(row: CandidateRow): Candidate {
-  const fullName = row.name || normalizeName(row.full_name, row.phone ?? "");
+  const rawName = row.name || normalizeName(row.full_name, row.phone ?? "");
+  const fullName = decodeHebrew(rawName);
   const profile = normalizeProfile(row.localized_profile);
   const documentsReady = normalizeDocuments(row.documents);
   const score = typeof profile.score === "number" ? profile.score : null;
@@ -2741,13 +2767,14 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     score,
     createdAt: row.created_at,
     documentsReady,
-    note: profile.note,
+    note: decodeHebrew(profile.note),
     nextStepDueAt: row.next_step_due_at,
     lastContactedAt: row.last_contacted_at,
   };
 }
 
 function normalizeName(value: Json, fallback: string) {
+  if (typeof value === "string") return value || fallback;
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
   const record = value as Record<string, Json | undefined>;
   return (
