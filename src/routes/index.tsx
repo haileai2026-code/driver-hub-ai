@@ -133,6 +133,34 @@ type CandidateForm = {
 };
 type AuthMode = "login" | "firstAdmin";
 
+type PartnerOption = "Egged" | "Afikim" | "Other";
+type CandidateInlinePatch = {
+  name: string;
+  phone: string;
+  age: string;
+  city: CityOption;
+  stage: "Lead" | "Learning" | "Test" | "Placed";
+  license: "Not Started" | "Learning" | "Theory Ready" | "Test Scheduled" | "Licensed";
+  language: "he" | "am" | "ru";
+  partner: PartnerOption | null;
+  notes: string;
+};
+const PARTNER_OPTIONS: PartnerOption[] = ["Egged", "Afikim", "Other"];
+const LICENSE_OPTIONS = ["Not Started", "Learning", "Theory Ready", "Test Scheduled", "Licensed"] as const;
+const LICENSE_LABELS: Record<(typeof LICENSE_OPTIONS)[number], string> = {
+  "Not Started": "טרם החל",
+  Learning: "לומד",
+  "Theory Ready": "מוכן לתאוריה",
+  "Test Scheduled": "טסט מתוזמן",
+  Licensed: "מורשה",
+};
+const STAGE_OPTIONS = ["Lead", "Learning", "Test", "Placed"] as const;
+const LANGUAGE_OPTIONS: Array<{ value: "he" | "am" | "ru"; label: string }> = [
+  { value: "he", label: "עברית" },
+  { value: "am", label: "אמהרית" },
+  { value: "ru", label: "רוסית" },
+];
+
 const navItems: Array<{
   key: PageKey;
   label: string;
