@@ -778,17 +778,51 @@ function HaileApp() {
             )}
             {activePage === "agents" && (
               <AgentsPage
-                selected={selected}
-                canEdit={canEdit}
+                candidates={candidates}
                 logs={logs}
-                onAi={runAi}
-                onApplyStatus={runAgentStatusUpdate}
+                selectedId={selectedId}
+                onSelectCandidate={setSelectedId}
+                canEdit={canEdit}
                 onCheckConnections={runAgentConnectionCheck}
                 onSendWhatsAppDocsReminders={runWhatsAppDocsReminders}
                 agentStatuses={agentStatuses}
                 isCheckingAgents={isCheckingAgents}
                 isSendingWhatsAppReminders={isSendingWhatsAppReminders}
                 actionStatus={actionStatus}
+                setActionStatus={setActionStatus}
+                onReload={loadLiveData}
+                onRecordAction={async (input) => {
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  return await recordAgent({ data: { ...input, accessToken } });
+                }}
+                onSaveRating={async (input) => {
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  return await saveRating({ data: { ...input, accessToken } });
+                }}
+                onGenerateText={async (mode) => {
+                  if (!selected) return null;
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return null;
+                  const result = await generateText({
+                    data: { accessToken, candidateId: selected.id, mode },
+                  });
+                  return result.text;
+                }}
+                onUpdateStage={async (stage) => {
+                  if (!selected) return { ok: false, message: "אין מועמד נבחר." };
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const accessToken = sessionData.session?.access_token;
+                  if (!accessToken) return { ok: false, message: "יש להתחבר עם משתמש מורשה." };
+                  const result = await updateStage({
+                    data: { accessToken, id: selected.id, stage },
+                  });
+                  return result;
+                }}
               />
             )}
             {activePage === "reports" && <ReportsPage />}
