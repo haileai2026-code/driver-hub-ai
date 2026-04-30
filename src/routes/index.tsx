@@ -1316,6 +1316,9 @@ function CandidatesPage({
                 candidate={candidate}
                 active={selected?.id === candidate.id}
                 onClick={() => onSelect(candidate.id)}
+                canEdit={canEdit}
+                onInlineSave={onInlineSave}
+                onInlineNote={onInlineNote}
               />
             ))}
           </div>
