@@ -1183,6 +1183,11 @@ function AgentsPage({
   logs,
   onAi,
   onApplyStatus,
+  onCheckConnections,
+  onSendWhatsAppDocsReminders,
+  agentStatuses,
+  isCheckingAgents,
+  isSendingWhatsAppReminders,
   actionStatus,
 }: {
   selected: Candidate | null;
@@ -1190,6 +1195,11 @@ function AgentsPage({
   logs: LogRow[];
   onAi: (mode: "candidate_next_step" | "translate_to_hebrew" | "status_template") => void;
   onApplyStatus: () => void;
+  onCheckConnections: () => void;
+  onSendWhatsAppDocsReminders: () => void;
+  agentStatuses: AutomationAgentStatus[];
+  isCheckingAgents: boolean;
+  isSendingWhatsAppReminders: boolean;
   actionStatus: string;
 }) {
   const agents = [
@@ -1209,21 +1219,64 @@ function AgentsPage({
     },
   ];
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {agents.map((agent) => (
-        <AgentCard
-          key={agent.name}
-          {...agent}
-          isConnected={Boolean(selected)}
-          activityCount={logs.length}
-          onPrimaryAction={selected ? (agent.name === "CIEL" ? onApplyStatus : () => onAi("candidate_next_step")) : undefined}
-          primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
-          selectedName={selected?.name ?? null}
-          statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
-        />
-      ))}
+    <div className="space-y-4">
+      <Panel
+        title="מרכז הפעלה לכל הסוכנים"
+        action={
+          <Button variant="command" onClick={onCheckConnections} disabled={isCheckingAgents}>
+            <ShieldCheck className="h-4 w-4" /> {isCheckingAgents ? "בודק חיבורים..." : "בדוק זמינות סוכנים"}
+          </Button>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(agentStatuses.length ? agentStatuses : defaultAgentStatuses()).map((status) => (
+            <div key={status.key} className="rounded-md border border-border bg-surface p-3 text-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <strong>{status.label}</strong>
+                <StatusBadge text={status.ready ? "זמין" : "דורש חיבור"} />
+              </div>
+              <p className="text-muted-foreground">{status.detail}</p>
+            </div>
+          ))}
+        </div>
+        <Button
+          className="mt-4 min-h-11"
+          variant="intel"
+          onClick={onSendWhatsAppDocsReminders}
+          disabled={!canEdit || isSendingWhatsAppReminders}
+        >
+          <Phone className="h-4 w-4" /> {isSendingWhatsAppReminders ? "שולח תזכורות..." : "הפעל תזכורות WhatsApp למסמכים חסרים"}
+        </Button>
+        <p className="mt-3 text-sm text-muted-foreground">{actionStatus}</p>
+      </Panel>
+      <div className="grid gap-4 md:grid-cols-2">
+        {agents.map((agent) => (
+          <AgentCard
+            key={agent.name}
+            {...agent}
+            isConnected={Boolean(selected)}
+            activityCount={logs.length}
+            onPrimaryAction={selected ? (agent.name === "CIEL" ? onApplyStatus : () => onAi("candidate_next_step")) : undefined}
+            primaryActionLabel={agent.name === "CIEL" ? "עדכן סטטוס ביומן" : "הפעל על מועמד"}
+            selectedName={selected?.name ?? null}
+            statusText={selected ? actionStatus : "בחר מועמד כדי לחבר סוכן לנתונים חיים"}
+          />
+        ))}
+      </div>
     </div>
   );
+}
+
+function defaultAgentStatuses(): AutomationAgentStatus[] {
+  return [
+    { key: "gmail", label: "Gmail / SOL", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "calendar", label: "Google Calendar / SOL", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "docs", label: "Google Docs", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "sheets", label: "Google Sheets", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "drive", label: "Google Drive", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
+    { key: "twilio_whatsapp", label: "Twilio WhatsApp", ready: false, detail: "יש לחבר Twilio כדי לשלוח WhatsApp." },
+    { key: "haile_ai", label: "Haile AI Gateway", ready: false, detail: "לחץ בדיקה כדי לוודא זמינות AI." },
+  ];
 }
 
 function QuickCandidateForm({
