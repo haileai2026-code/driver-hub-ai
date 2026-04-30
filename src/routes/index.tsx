@@ -195,6 +195,8 @@ function HaileApp() {
   const applyAgentOperation = useServerFn(applyHaileAiOperation);
   const checkAgents = useServerFn(checkAutomationAgents);
   const sendDocsReminders = useServerFn(sendMissingDocsWhatsAppReminders);
+  const recordAgent = useServerFn(recordAgentAction);
+  const saveRating = useServerFn(saveCandidateRating);
   const createAdmin = useServerFn(createFirstSuperAdmin);
   const inviteUser = useServerFn(inviteSystemUser);
   const getSessionRole = useServerFn(getAuthorizedSession);
