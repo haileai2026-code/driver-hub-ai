@@ -64,7 +64,7 @@ export type Database = {
           id: string
           last_contacted_at: string | null
           license: string | null
-          license_status: Database["public"]["Enums"]["license_status"]
+          license_status: Database["public"]["Enums"]["license_status"] | null
           localized_profile: Json
           name: string
           next_step_due_at: string | null
@@ -85,7 +85,7 @@ export type Database = {
           id?: string
           last_contacted_at?: string | null
           license?: string | null
-          license_status?: Database["public"]["Enums"]["license_status"]
+          license_status?: Database["public"]["Enums"]["license_status"] | null
           localized_profile?: Json
           name: string
           next_step_due_at?: string | null
@@ -106,7 +106,7 @@ export type Database = {
           id?: string
           last_contacted_at?: string | null
           license?: string | null
-          license_status?: Database["public"]["Enums"]["license_status"]
+          license_status?: Database["public"]["Enums"]["license_status"] | null
           localized_profile?: Json
           name?: string
           next_step_due_at?: string | null
