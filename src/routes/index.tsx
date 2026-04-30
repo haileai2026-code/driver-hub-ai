@@ -320,10 +320,32 @@ function HaileApp() {
         setImportStatus("יש להתחבר עם משתמש מורשה לפני ייבוא מועמדים.");
         return;
       }
-      const result = await importCandidates({ data: { accessToken, rows: importRows } });
-      setImportStatus(`ייבוא הושלם: ${result.inserted} נשמרו, ${result.skipped} דולגו.`);
-      setImportRows([]);
-      await loadLiveData();
+
+      const BATCH = 100;
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      const allErrors: string[] = [];
+
+      for (let i = 0; i < importRows.length; i += BATCH) {
+        const batch = importRows.slice(i, i + BATCH);
+        try {
+          const result = await importCandidates({ data: { accessToken, rows: batch } });
+          totalInserted += result.inserted;
+          totalSkipped += result.skipped;
+          if (result.errors?.length) allErrors.push(...result.errors);
+        } catch (err) {
+          allErrors.push(err instanceof Error ? err.message : "שגיאה לא ידועה באצווה.");
+          totalSkipped += batch.length;
+        }
+      }
+
+      const summary = `ייבוא הושלם: ${totalInserted} נשמרו, ${totalSkipped} דולגו.`;
+      const errorTail = allErrors.length ? ` שגיאות: ${allErrors.slice(0, 3).join(" | ")}${allErrors.length > 3 ? ` (+${allErrors.length - 3})` : ""}` : "";
+      setImportStatus(summary + errorTail);
+      if (totalInserted > 0) {
+        setImportRows([]);
+        await loadLiveData();
+      }
     } finally {
       setIsImporting(false);
     }
@@ -1163,6 +1185,16 @@ function CandidatesPage({
           />
         }
       >
+        {(importStatus || importRows > 0) ? (
+          <div className="mb-4 space-y-1 rounded-md border border-border bg-surface p-3 text-xs">
+            <p className="text-muted-foreground">{importStatus}</p>
+            {importRows > 0 && (
+              <p className="font-medium text-foreground">
+                תצוגה מקדימה: {importRows} שורות מוכנות. לחץ "ייבא" לשמירה.
+              </p>
+            )}
+          </div>
+        ) : null}
         <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <label className="flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-3">
             <Search className="h-4 w-4 text-muted-foreground" />
