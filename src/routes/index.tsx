@@ -2735,7 +2735,7 @@ function normalizeCandidate(row: CandidateRow): Candidate {
     city: row.city ? String(row.city) : "Other",
     language: languageLabel(row.preferred_language),
     langCode: (row.preferred_language === "he" || row.preferred_language === "ru" ? row.preferred_language : "am") as "he" | "am" | "ru",
-    licenseStatus: row.license_status,
+    licenseStatus: row.license_status ?? "Not Started",
     stage: row.stage,
     grade: gradeFromScore(score),
     score,
