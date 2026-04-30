@@ -2141,7 +2141,7 @@ function QuickCandidateForm({
         <SmallSelect
           label="עיר"
           value={form.city}
-          options={[...CITY_OPTIONS]}
+          options={CITY_OPTIONS.map((c) => ({ value: c, label: CITY_LABELS_HE[c] }))}
           onChange={(city) => onChange({ ...form, city: city as CandidateForm["city"] })}
         />
         <SmallSelect
