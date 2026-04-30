@@ -50,42 +50,38 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
     }
 
     const errors: string[] = [];
-    const candidates: CandidateInsert[] = data.rows.flatMap((row, index) => {
-      const mapped = mapImportRow(row);
+    let inserted = 0;
+    let skipped = 0;
+
+    for (let index = 0; index < data.rows.length; index++) {
+      const row = data.rows[index];
       const rowNumber = index + 2;
+      const mapped = mapImportRow(row);
 
       if (!mapped.phone) {
         errors.push(`שורה ${rowNumber}: חסר מספר טלפון.`);
-        return [];
+        skipped++;
+        continue;
       }
 
       if (!mapped.city) {
-        errors.push(`שורה ${rowNumber}: עיר חייבת להיות Ashkelon או Kiryat Gat.`);
-        return [];
+        mapped.city = "Ashkelon";
       }
 
-      return [mapped as CandidateInsert];
-    });
-
-    candidates.forEach((candidate) => {
+      const candidate = mapped as CandidateInsert;
       candidate.created_by = userData.user.id;
       candidate.license_status = normalizeLicense(String(candidate.license ?? ""));
-    });
 
-    if (candidates.length === 0) {
-      return { inserted: 0, skipped: data.rows.length, errors };
+      const { error: insertError } = await supabaseAdmin.from("candidates").insert(candidate);
+      if (insertError) {
+        errors.push(`שורה ${rowNumber}: ${insertError.message}`);
+        skipped++;
+        continue;
+      }
+      inserted++;
     }
 
-    const { data: insertedRows, error } = await supabaseAdmin.from("candidates").insert(candidates).select("id");
-    if (error) {
-      return { inserted: 0, skipped: data.rows.length, errors: [error.message, ...errors] };
-    }
-
-    return {
-      inserted: insertedRows?.length ?? candidates.length,
-      skipped: data.rows.length - candidates.length,
-      errors,
-    };
+    return { inserted, skipped, errors };
   });
 
 function mapImportRow(row: Record<string, string | number | boolean | null>): CandidateImportDraft {
