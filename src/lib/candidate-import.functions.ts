@@ -30,6 +30,7 @@ const headerMap = {
   notesHe: ["notes_he", "note_he", "הערות", "הערות בעברית"],
   notesAm: ["notes_am", "note_am", "הערות באמהרית"],
   notesRu: ["notes_ru", "note_ru", "הערות ברוסית"],
+  partner: ["partner", "assigned_to", "שותף", "מטפל", "אחראי"],
 } as const;
 
 export const importCandidatesFromRows = createServerFn({ method: "POST" })
