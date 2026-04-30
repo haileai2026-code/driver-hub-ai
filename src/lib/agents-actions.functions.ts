@@ -57,14 +57,13 @@ export const recordAgentAction = createServerFn({ method: "POST" })
     const auth = await authorize(data.accessToken, ["super_admin", "operator"]);
     if (!auth.ok) return { ok: false as const, message: auth.message };
 
-    const langKey =
-      data.language === "he" ? "notes_hebrew" : data.language === "am" ? "notes_amharic" : "notes_russian";
-
     const { error } = await supabaseAdmin.from("operation_logs").insert({
       candidate_id: data.candidateId,
       operator_name: data.agentName,
       interaction_type: data.actionType,
-      [langKey]: data.content,
+      notes_hebrew: data.language === "he" ? data.content : null,
+      notes_amharic: data.language === "am" ? data.content : null,
+      notes_russian: data.language === "ru" ? data.content : null,
       translated_hebrew: data.language === "he" ? data.content : null,
       source_message: data.content,
       follow_up_required: data.followUpRequired ?? false,
