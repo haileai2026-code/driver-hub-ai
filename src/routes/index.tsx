@@ -418,6 +418,44 @@ function HaileApp() {
     }
   };
 
+  const runAgentConnectionCheck = async () => {
+    setIsCheckingAgents(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setActionStatus("יש להתחבר עם משתמש מורשה כדי לבדוק סוכנים.");
+        return;
+      }
+      const result = await checkAgents({ data: { accessToken } });
+      setAgentStatuses(result.statuses);
+      setActionStatus(result.message);
+    } finally {
+      setIsCheckingAgents(false);
+    }
+  };
+
+  const runWhatsAppDocsReminders = async () => {
+    if (!canEdit) {
+      setActionStatus("רק משתמש עם הרשאת עריכה יכול להפעיל תזכורות WhatsApp.");
+      return;
+    }
+    setIsSendingWhatsAppReminders(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setActionStatus("יש להתחבר עם משתמש מורשה כדי להפעיל אוטומציה.");
+        return;
+      }
+      const result = await sendDocsReminders({ data: { accessToken } });
+      setActionStatus(result.message);
+      if (result.ok) await loadLiveData();
+    } finally {
+      setIsSendingWhatsAppReminders(false);
+    }
+  };
+
   const saveCandidate = async () => {
     if (!canEdit) {
       setActionStatus("הרשאת VIEWER מאפשרת צפייה בלבד.");
@@ -735,6 +773,11 @@ function HaileApp() {
                 logs={logs}
                 onAi={runAi}
                 onApplyStatus={runAgentStatusUpdate}
+                onCheckConnections={runAgentConnectionCheck}
+                onSendWhatsAppDocsReminders={runWhatsAppDocsReminders}
+                agentStatuses={agentStatuses}
+                isCheckingAgents={isCheckingAgents}
+                isSendingWhatsAppReminders={isSendingWhatsAppReminders}
                 actionStatus={actionStatus}
               />
             )}
