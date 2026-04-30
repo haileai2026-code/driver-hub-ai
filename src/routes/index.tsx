@@ -2825,7 +2825,7 @@ function candidateToForm(candidate: Candidate): CandidateForm {
     name: candidate.name,
     phone: candidate.phone,
     age: candidate.age ? String(candidate.age) : "",
-    city: candidate.city === "Kiryat Gat" ? "Kiryat Gat" : "Ashkelon",
+    city: (normalizeCityValue(String(candidate.city ?? "")) ?? (candidate.city as CityOption | undefined) ?? "Other"),
     language: candidate.language === "עברית" ? "he" : candidate.language === "רוסית" ? "ru" : "am",
     stage: (["Lead", "Learning", "Test", "Placed"] as const).includes(
       candidate.stage as CandidateForm["stage"],
