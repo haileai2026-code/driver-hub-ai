@@ -95,6 +95,7 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
   const noteRu = read(row, headerMap.notesRu);
   const name = nameHe || nameAm || nameRu || phone;
 
+  const partner = read(row, headerMap.partner);
   return {
     name,
     age: normalizeAge(read(row, headerMap.age)),
@@ -103,6 +104,7 @@ function mapImportRow(row: Record<string, string | number | boolean | null>): Ca
     license: normalizeLicense(read(row, headerMap.license)),
     stage: normalizeStage(read(row, headerMap.stage)),
     notes: [noteHe, noteAm, noteRu].filter(Boolean).join("\n") || null,
+    assigned_to: partner || null,
   };
 }
 
