@@ -37,6 +37,17 @@ const headerMap = {
   partner: ["partner", "assigned_to", "שותף", "מטפל", "אחראי"],
 } as const;
 
+const positionalColumnMap = {
+  name: "__col1",
+  phone: "__col2",
+  age: "__col3",
+  license: "__col4",
+  city: "__col5",
+  stage: "__col6",
+  partner: "__col7",
+  notes: "__col8",
+} as const;
+
 export const importCandidatesFromRows = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ImportSchema.parse(input))
   .handler(async ({ data }) => {
@@ -101,24 +112,28 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
   });
 
 function mapImportRow(row: Record<string, string | number | boolean | null>): CandidateImportDraft {
-  const nameHe = read(row, headerMap.nameHe) || read(row, headerMap.name);
-  const nameAm = read(row, headerMap.nameAm) || nameHe;
-  const nameRu = read(row, headerMap.nameRu) || nameHe;
-  const phone = normalizePhone(read(row, headerMap.phone));
-  const noteHe = read(row, headerMap.notesHe);
-  const noteAm = read(row, headerMap.notesAm);
-  const noteRu = read(row, headerMap.notesRu);
-  const name = nameHe || nameAm || nameRu;
+  const name =
+    readPosition(row, positionalColumnMap.name) ||
+    read(row, headerMap.nameHe) ||
+    read(row, headerMap.name) ||
+    read(row, headerMap.nameAm) ||
+    read(row, headerMap.nameRu);
+  const phone = normalizePhone(readPosition(row, positionalColumnMap.phone) || read(row, headerMap.phone));
+  const notes =
+    readPosition(row, positionalColumnMap.notes) ||
+    read(row, headerMap.notesHe) ||
+    read(row, headerMap.notesAm) ||
+    read(row, headerMap.notesRu);
+  const partner = readPosition(row, positionalColumnMap.partner) || read(row, headerMap.partner);
 
-  const partner = read(row, headerMap.partner);
   return {
     name,
-    age: normalizeAge(read(row, headerMap.age)),
-    city: normalizeCity(read(row, headerMap.city)) ?? null,
+    age: normalizeAge(readPosition(row, positionalColumnMap.age) || read(row, headerMap.age)),
+    city: normalizeCity(readPosition(row, positionalColumnMap.city) || read(row, headerMap.city)) ?? null,
     phone: phone || null,
-    license: normalizeText(read(row, headerMap.license)),
-    stage: normalizeStage(read(row, headerMap.stage)),
-    notes: [noteHe, noteAm, noteRu].filter(Boolean).join("\n") || null,
+    license: normalizeText(readPosition(row, positionalColumnMap.license) || read(row, headerMap.license)),
+    stage: normalizeStage(readPosition(row, positionalColumnMap.stage) || read(row, headerMap.stage)),
+    notes: normalizeText(notes),
     assigned_to: partner || null,
   };
 }
@@ -127,6 +142,14 @@ function read(row: Record<string, string | number | boolean | null>, aliases: re
   const entries = Object.entries(row);
   const match = entries.find(([key]) => aliases.some((alias) => normalizeHeader(key) === normalizeHeader(alias)));
   const value = match?.[1];
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function readPosition(
+  row: Record<string, string | number | boolean | null>,
+  positionalKey: (typeof positionalColumnMap)[keyof typeof positionalColumnMap],
+) {
+  const value = row[positionalKey];
   return value === null || value === undefined ? "" : String(value).trim();
 }
 

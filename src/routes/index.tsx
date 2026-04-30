@@ -2872,20 +2872,48 @@ async function parseImportFile(
   const workbook = XLSX.read(buffer, { type: "array", raw: false });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("הקובץ ריק או לא תקין.");
-  const rows = XLSX.utils.sheet_to_json<Record<string, string | number | boolean | null>>(
-    workbook.Sheets[sheetName],
-    { defval: "", raw: false },
-  );
-  const cleanRows = rows
-    .map((row) =>
-      Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [
-          key.trim(),
-          typeof value === "string" ? value.trim() : value,
-        ]),
-      ),
-    )
+  const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(workbook.Sheets[sheetName], {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: false,
+  });
+
+  const normalizedRows = rows
+    .map((row) => row.map((value) => (typeof value === "string" ? value.trim() : value)))
+    .filter((row) => row.some((value) => String(value ?? "").trim().length > 0));
+
+  const firstRow = normalizedRows[0] ?? [];
+  const hasHeaderRow = firstRow.some((value) => {
+    const normalized = String(value ?? "")
+      .toLowerCase()
+      .replace(/[\s_\-:()]/g, "")
+      .trim();
+    return normalized.includes("שם") || normalized.includes("name");
+  });
+
+  const headerRow = hasHeaderRow ? firstRow : [];
+  const dataRows = hasHeaderRow ? normalizedRows.slice(1) : normalizedRows;
+
+  const cleanRows = dataRows
+    .map((row) => {
+      const mappedRow: Record<string, string | number | boolean | null> = {};
+
+      row.forEach((value, index) => {
+        const positionalKey = `__col${index + 1}`;
+        mappedRow[positionalKey] = value;
+
+        const rawHeader = headerRow[index];
+        const headerKey = typeof rawHeader === "string" ? rawHeader.trim() : String(rawHeader ?? "").trim();
+        if (headerKey) {
+          mappedRow[headerKey] = value;
+        }
+      });
+
+      return mappedRow;
+    })
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
+
   if (!cleanRows.length) throw new Error("לא נמצאו שורות מועמדים בקובץ.");
   return cleanRows.slice(0, 500);
 }
