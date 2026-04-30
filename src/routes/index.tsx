@@ -2889,7 +2889,7 @@ async function parseImportFile(
       .toLowerCase()
       .replace(/[\s_\-:()]/g, "")
       .trim();
-    return normalized === "שם" || normalized.includes("name");
+    return normalized.includes("שם") || normalized.includes("name");
   });
 
   const headerRow = hasHeaderRow ? firstRow : [];

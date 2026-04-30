@@ -113,26 +113,26 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
 
 function mapImportRow(row: Record<string, string | number | boolean | null>): CandidateImportDraft {
   const name =
+    readPosition(row, positionalColumnMap.name) ||
     read(row, headerMap.nameHe) ||
     read(row, headerMap.name) ||
     read(row, headerMap.nameAm) ||
-    read(row, headerMap.nameRu) ||
-    readPosition(row, positionalColumnMap.name);
-  const phone = normalizePhone(read(row, headerMap.phone) || readPosition(row, positionalColumnMap.phone));
+    read(row, headerMap.nameRu);
+  const phone = normalizePhone(readPosition(row, positionalColumnMap.phone) || read(row, headerMap.phone));
   const notes =
+    readPosition(row, positionalColumnMap.notes) ||
     read(row, headerMap.notesHe) ||
     read(row, headerMap.notesAm) ||
-    read(row, headerMap.notesRu) ||
-    readPosition(row, positionalColumnMap.notes);
-  const partner = read(row, headerMap.partner) || readPosition(row, positionalColumnMap.partner);
+    read(row, headerMap.notesRu);
+  const partner = readPosition(row, positionalColumnMap.partner) || read(row, headerMap.partner);
 
   return {
     name,
-    age: normalizeAge(read(row, headerMap.age) || readPosition(row, positionalColumnMap.age)),
-    city: normalizeCity(read(row, headerMap.city) || readPosition(row, positionalColumnMap.city)) ?? null,
+    age: normalizeAge(readPosition(row, positionalColumnMap.age) || read(row, headerMap.age)),
+    city: normalizeCity(readPosition(row, positionalColumnMap.city) || read(row, headerMap.city)) ?? null,
     phone: phone || null,
-    license: normalizeText(read(row, headerMap.license) || readPosition(row, positionalColumnMap.license)),
-    stage: normalizeStage(read(row, headerMap.stage) || readPosition(row, positionalColumnMap.stage)),
+    license: normalizeText(readPosition(row, positionalColumnMap.license) || read(row, headerMap.license)),
+    stage: normalizeStage(readPosition(row, positionalColumnMap.stage) || read(row, headerMap.stage)),
     notes: normalizeText(notes),
     assigned_to: partner || null,
   };
