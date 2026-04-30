@@ -2476,7 +2476,7 @@ function CandidateCard({
           <div>
             <h3 className="font-black">{candidate.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {formatPhone(candidate.phone)} · {candidate.city} · {candidate.language}
+              {formatPhone(candidate.phone)} · {cityLabel(candidate.city)} · {candidate.language}
             </p>
             {lastUpdated && (
               <p className="mt-1 text-xs text-muted-foreground/80">
