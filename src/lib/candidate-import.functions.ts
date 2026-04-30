@@ -130,10 +130,7 @@ function normalizeAge(value: string) {
 }
 
 function normalizeCity(value: string): CandidateInsert["city"] | undefined {
-  const normalized = normalizeHeader(value);
-  if (["ashkelon", "אשקלון"].includes(normalized)) return "Ashkelon";
-  if (["kiryatgat", "קריתגת", "קרייתגת"].includes(normalized)) return "Kiryat Gat";
-  return undefined;
+  return normalizeCityValue(value) as CandidateInsert["city"] | undefined;
 }
 
 function normalizeLanguage(value: string): Language {
