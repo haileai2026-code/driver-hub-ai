@@ -320,10 +320,32 @@ function HaileApp() {
         setImportStatus("יש להתחבר עם משתמש מורשה לפני ייבוא מועמדים.");
         return;
       }
-      const result = await importCandidates({ data: { accessToken, rows: importRows } });
-      setImportStatus(`ייבוא הושלם: ${result.inserted} נשמרו, ${result.skipped} דולגו.`);
-      setImportRows([]);
-      await loadLiveData();
+
+      const BATCH = 100;
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      const allErrors: string[] = [];
+
+      for (let i = 0; i < importRows.length; i += BATCH) {
+        const batch = importRows.slice(i, i + BATCH);
+        try {
+          const result = await importCandidates({ data: { accessToken, rows: batch } });
+          totalInserted += result.inserted;
+          totalSkipped += result.skipped;
+          if (result.errors?.length) allErrors.push(...result.errors);
+        } catch (err) {
+          allErrors.push(err instanceof Error ? err.message : "שגיאה לא ידועה באצווה.");
+          totalSkipped += batch.length;
+        }
+      }
+
+      const summary = `ייבוא הושלם: ${totalInserted} נשמרו, ${totalSkipped} דולגו.`;
+      const errorTail = allErrors.length ? ` שגיאות: ${allErrors.slice(0, 3).join(" | ")}${allErrors.length > 3 ? ` (+${allErrors.length - 3})` : ""}` : "";
+      setImportStatus(summary + errorTail);
+      if (totalInserted > 0) {
+        setImportRows([]);
+        await loadLiveData();
+      }
     } finally {
       setIsImporting(false);
     }
