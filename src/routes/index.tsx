@@ -1473,7 +1473,15 @@ function AgentsPage({
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <strong>{status.label}</strong>
-                <StatusBadge text={status.ready ? "זמין" : "דורש חיבור"} />
+                <span
+                  className={`inline-flex rounded-sm px-2 py-1 text-xs font-bold ${
+                    status.ready
+                      ? "bg-success/15 text-success"
+                      : "bg-destructive/15 text-destructive"
+                  }`}
+                >
+                  {status.ready ? "מחובר" : "לא מחובר"}
+                </span>
               </div>
               <p className="text-muted-foreground">{status.detail}</p>
             </div>
