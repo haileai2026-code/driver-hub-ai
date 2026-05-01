@@ -10,33 +10,44 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicHooksMorningSummaryRouteImport } from './routes/api/public/hooks/morning-summary'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksMorningSummaryRoute =
+  ApiPublicHooksMorningSummaryRouteImport.update({
+    id: '/api/public/hooks/morning-summary',
+    path: '/api/public/hooks/morning-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/public/hooks/morning-summary'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/public/hooks/morning-summary'
+  id: '__root__' | '/' | '/api/public/hooks/morning-summary'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicHooksMorningSummaryRoute: typeof ApiPublicHooksMorningSummaryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +59,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/morning-summary': {
+      id: '/api/public/hooks/morning-summary'
+      path: '/api/public/hooks/morning-summary'
+      fullPath: '/api/public/hooks/morning-summary'
+      preLoaderRoute: typeof ApiPublicHooksMorningSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicHooksMorningSummaryRoute: ApiPublicHooksMorningSummaryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
