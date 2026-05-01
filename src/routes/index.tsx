@@ -1656,6 +1656,8 @@ function ReminderDelayCorrelations({
     </section>
   );
 }
+
+function CandidatesPage({
   candidates,
   selected,
   searchTerm,
