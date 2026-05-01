@@ -69,6 +69,7 @@ import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.funct
 import {
   checkAutomationAgents,
   sendMissingDocsWhatsAppReminders,
+  sendTestNotification,
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
@@ -3278,11 +3279,123 @@ function SettingsPage({
         <ConnectionStatusList statuses={agentStatuses} />
       </Panel>
 
+      <Panel title="בדיקת ערוצי תקשורת">
+        <IntegrationTester isSuperAdmin={isSuperAdmin} />
+      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
         </Button>
       </Panel>
+    </div>
+  );
+}
+
+function IntegrationTester({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [channel, setChannel] = useState<"slack" | "telegram" | "whatsapp">("slack");
+  const [target, setTarget] = useState("");
+  const [message, setMessage] = useState("בדיקה מהמערכת — Haile AI 🚀");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const sendTest = useServerFn(sendTestNotification);
+
+  if (!isSuperAdmin) {
+    return <SettingsGrid items={["רק SUPER_ADMIN יכול לבצע בדיקות שליחה."]} />;
+  }
+
+  const placeholder =
+    channel === "slack"
+      ? "#general או C0123ABC"
+      : channel === "telegram"
+        ? "Chat ID (לדוגמה 123456789)"
+        : "+972501234567";
+
+  const handleSend = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setResult({ ok: false, message: "יש להתחבר מחדש." });
+        return;
+      }
+      const res = await sendTest({
+        data: { accessToken, channel, target: target.trim(), message: message.trim() },
+      });
+      setResult({ ok: res.ok, message: res.message });
+    } catch (err) {
+      setResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "שגיאה לא ידועה.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-wrap gap-2">
+        {(["slack", "telegram", "whatsapp"] as const).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setChannel(c)}
+            className={cn(
+              "rounded-md border px-3 py-1.5 text-xs font-bold transition",
+              channel === c
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-border bg-surface text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {c === "slack" ? "Slack" : c === "telegram" ? "Telegram" : "WhatsApp"}
+          </button>
+        ))}
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">יעד</span>
+        <input
+          dir="ltr"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder={placeholder}
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">הודעת בדיקה</span>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        />
+      </label>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="tactical"
+          onClick={handleSend}
+          disabled={busy || !target.trim() || !message.trim()}
+        >
+          <Send className="h-4 w-4" />
+          {busy ? "שולח..." : "שלח בדיקה"}
+        </Button>
+        {result && (
+          <span
+            className={cn(
+              "text-xs",
+              result.ok ? "text-emerald-500" : "text-destructive",
+            )}
+          >
+            {result.message}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        כל בדיקה (הצלחה או כישלון) נרשמת אוטומטית ב-Operations log.
+      </p>
     </div>
   );
 }
