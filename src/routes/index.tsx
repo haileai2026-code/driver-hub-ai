@@ -3287,6 +3287,10 @@ function SettingsPage({
         <WhatsAppSenderSettings isSuperAdmin={isSuperAdmin} defaultPhone={benyWhatsapp} />
       </Panel>
 
+      <Panel title="שגיאות ערוצים אחרונות">
+        <IntegrationFailuresPanel isAuthorized={isSuperAdmin} />
+      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
