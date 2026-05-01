@@ -10,7 +10,16 @@ const AccessTokenSchema = z.object({
 type AppRole = "super_admin" | "operator" | "viewer";
 
 export type AutomationAgentStatus = {
-  key: "gmail" | "calendar" | "docs" | "sheets" | "drive" | "meta_whatsapp" | "haile_ai";
+  key:
+    | "gmail"
+    | "calendar"
+    | "docs"
+    | "sheets"
+    | "drive"
+    | "meta_whatsapp"
+    | "haile_ai"
+    | "slack"
+    | "telegram";
   label: string;
   ready: boolean;
   detail: string;
@@ -46,6 +55,46 @@ function normalizeMetaPhone(phone: string | null) {
   return digits;
 }
 
+async function verifyConnector(connectorApiKey: string | undefined): Promise<{
+  ready: boolean;
+  detail: string;
+  latencyMs?: number;
+}> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (!lovableKey) return { ready: false, detail: "LOVABLE_API_KEY חסר." };
+  if (!connectorApiKey) return { ready: false, detail: "החיבור לא מקושר לפרויקט." };
+  try {
+    const res = await fetch(VERIFY_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connectorApiKey,
+      },
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      outcome?: string;
+      latency_ms?: number;
+      error?: string;
+      message?: string;
+    };
+    if (!res.ok) {
+      return { ready: false, detail: json.message ?? `שגיאת gateway (${res.status}).` };
+    }
+    if (json.outcome === "verified") {
+      return { ready: true, detail: "מאומת דרך Connector Gateway.", latencyMs: json.latency_ms };
+    }
+    if (json.outcome === "skipped") {
+      return { ready: true, detail: "מחובר (ללא בדיקת אימות).", latencyMs: json.latency_ms };
+    }
+    return { ready: false, detail: json.error ?? "אימות נכשל." };
+  } catch (err) {
+    return {
+      ready: false,
+      detail: err instanceof Error ? err.message : "שגיאה לא ידועה בבדיקת חיבור.",
+    };
+  }
+}
+
 function metaWhatsAppStatus(): AutomationAgentStatus {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -78,31 +127,177 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
     if (!auth.ok)
       return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
-    const googleReady = (label: string, statusKey: AutomationAgentStatus["key"]) => ({
-      key: statusKey,
-      label,
-      ready: true,
-      detail: "מחובר דרך Lovable Cloud.",
-    });
+    // Verify Google connectors and Slack/Telegram in parallel via gateway.
+    const [gmail, calendar, docs, sheets, drive, slack, telegram] = await Promise.all([
+      verifyConnector(process.env.GOOGLE_MAIL_API_KEY),
+      verifyConnector(process.env.GOOGLE_CALENDAR_API_KEY),
+      verifyConnector(process.env.GOOGLE_DOCS_API_KEY),
+      verifyConnector(process.env.GOOGLE_SHEETS_API_KEY),
+      verifyConnector(process.env.GOOGLE_DRIVE_API_KEY),
+      verifyConnector(process.env.SLACK_API_KEY),
+      verifyConnector(process.env.TELEGRAM_API_KEY),
+    ]);
 
     const statuses: AutomationAgentStatus[] = [
-      googleReady("Gmail / SOL", "gmail"),
-      googleReady("Google Calendar / SOL", "calendar"),
-      googleReady("Google Docs", "docs"),
-      googleReady("Google Sheets", "sheets"),
-      googleReady("Google Drive", "drive"),
+      { key: "gmail", label: "Gmail / SOL", ...gmail },
+      { key: "calendar", label: "Google Calendar / SOL", ...calendar },
+      { key: "docs", label: "Google Docs", ...docs },
+      { key: "sheets", label: "Google Sheets", ...sheets },
+      { key: "drive", label: "Google Drive", ...drive },
+      { key: "slack", label: "Slack (התראות צוות)", ...slack },
+      { key: "telegram", label: "Telegram (התראות בני)", ...telegram },
+      metaWhatsAppStatus(),
+      {
+        key: "haile_ai",
+        label: "Haile AI Gateway",
+        ready: Boolean(process.env.LOVABLE_API_KEY),
+        detail: process.env.LOVABLE_API_KEY ? "מודל AI זמין להפעלה." : "חיבור AI חסר.",
+      },
     ];
 
-    statuses.push(metaWhatsAppStatus());
-
-    statuses.push({
-      key: "haile_ai",
-      label: "Haile AI Gateway",
-      ready: Boolean(process.env.LOVABLE_API_KEY),
-      detail: process.env.LOVABLE_API_KEY ? "מודל AI זמין להפעלה." : "חיבור AI חסר.",
-    });
-
     return { ok: true as const, message: "בדיקת סוכנים הושלמה.", statuses };
+  });
+
+const TestNotificationSchema = AccessTokenSchema.extend({
+  channel: z.enum(["slack", "telegram", "whatsapp"]),
+  target: z.string().trim().min(1).max(200),
+  message: z.string().trim().min(1).max(2000),
+});
+
+async function logIntegrationEvent(params: {
+  channel: string;
+  target: string;
+  message: string;
+  status: "sent" | "failed";
+  error?: string;
+}) {
+  await supabaseAdmin.from("operation_logs").insert({
+    candidate_id: null,
+    operator_name: `Integration:${params.channel}`,
+    interaction_type: `integration_test_${params.status}`,
+    notes_hebrew: `[${params.status === "sent" ? "נשלח" : "נכשל"} ${new Date().toISOString()}] ערוץ ${params.channel} → ${params.target}${
+      params.error ? ` | ${params.error}` : ""
+    }`,
+    translated_hebrew: params.message,
+    source_message: params.message,
+    follow_up_required: params.status === "failed",
+  });
+}
+
+export const sendTestNotification = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => TestNotificationSchema.parse(input))
+  .handler(async ({ data }) => {
+    const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
+    if (!auth.ok) return { ok: false as const, message: auth.message };
+
+    const lovableKey = process.env.LOVABLE_API_KEY;
+
+    try {
+      if (data.channel === "slack") {
+        const slackKey = process.env.SLACK_API_KEY;
+        if (!lovableKey || !slackKey)
+          throw new Error("Slack לא מחובר.");
+        const res = await fetch(
+          "https://connector-gateway.lovable.dev/slack/api/chat.postMessage",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableKey}`,
+              "X-Connection-Api-Key": slackKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ channel: data.target, text: data.message }),
+          },
+        );
+        const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!res.ok || json.ok === false)
+          throw new Error(json.error ?? `Slack שגיאה ${res.status}`);
+        await logIntegrationEvent({
+          channel: "slack",
+          target: data.target,
+          message: data.message,
+          status: "sent",
+        });
+        return { ok: true as const, message: `הודעה נשלחה ל-Slack (${data.target}).` };
+      }
+
+      if (data.channel === "telegram") {
+        const tgKey = process.env.TELEGRAM_API_KEY;
+        if (!lovableKey || !tgKey) throw new Error("Telegram לא מחובר.");
+        const res = await fetch(
+          "https://connector-gateway.lovable.dev/telegram/sendMessage",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableKey}`,
+              "X-Connection-Api-Key": tgKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ chat_id: data.target, text: data.message }),
+          },
+        );
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          description?: string;
+        };
+        if (!res.ok || json.ok === false)
+          throw new Error(json.description ?? `Telegram שגיאה ${res.status}`);
+        await logIntegrationEvent({
+          channel: "telegram",
+          target: data.target,
+          message: data.message,
+          status: "sent",
+        });
+        return { ok: true as const, message: `הודעה נשלחה ל-Telegram (${data.target}).` };
+      }
+
+      // whatsapp
+      const token = process.env.WHATSAPP_ACCESS_TOKEN;
+      const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      if (!token || !phoneId) throw new Error("WhatsApp לא מחובר.");
+      const res = await fetch(
+        `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: normalizeMetaPhone(data.target),
+            type: "text",
+            text: { body: data.message },
+          }),
+        },
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: { message?: string };
+        messages?: Array<{ id: string }>;
+      };
+      if (!res.ok)
+        throw new Error(json.error?.message ?? `WhatsApp שגיאה ${res.status}`);
+      await logIntegrationEvent({
+        channel: "whatsapp",
+        target: data.target,
+        message: data.message,
+        status: "sent",
+      });
+      return {
+        ok: true as const,
+        message: `הודעה נשלחה ב-WhatsApp (msg id: ${json.messages?.[0]?.id ?? ""}).`,
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "שגיאה לא ידועה.";
+      await logIntegrationEvent({
+        channel: data.channel,
+        target: data.target,
+        message: data.message,
+        status: "failed",
+        error: errMsg,
+      });
+      return { ok: false as const, message: errMsg };
+    }
   });
 
 export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" })
