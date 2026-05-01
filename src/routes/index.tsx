@@ -1548,6 +1548,171 @@ type SubAgentProps = {
   setActionStatus: (text: string) => void;
 };
 
+type ChatTurn = { role: "user" | "assistant"; content: string };
+
+function AgentChat({
+  agentKey,
+  agentName,
+  candidateId,
+  candidateName,
+  canEdit,
+}: {
+  agentKey: "recruiter" | "voice" | "ciel" | "sol";
+  agentName: string;
+  candidateId: string;
+  candidateName: string;
+  canEdit: boolean;
+}) {
+  // History is keyed by agent + candidate so switching candidates resets the chat.
+  const storageKey = `${agentKey}:${candidateId}`;
+  const [historyByKey, setHistoryByKey] = useState<Record<string, ChatTurn[]>>({});
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const messages = historyByKey[storageKey] ?? [];
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
+  const setMessages = (updater: (prev: ChatTurn[]) => ChatTurn[]) => {
+    setHistoryByKey((prev) => ({ ...prev, [storageKey]: updater(prev[storageKey] ?? []) }));
+  };
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || isSending) return;
+    if (!canEdit) {
+      setError("אין לך הרשאה לשלוח הודעות לסוכן.");
+      return;
+    }
+
+    setError(null);
+    setInput("");
+    const nextMessages: ChatTurn[] = [...messages, { role: "user", content: text }];
+    setMessages(() => nextMessages);
+    setIsSending(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setError("יש להתחבר מחדש.");
+        return;
+      }
+      const result = await chatWithAgent({
+        data: {
+          accessToken,
+          candidateId,
+          agent: agentKey,
+          messages: nextMessages,
+        },
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setMessages((prev) => [...prev, { role: "assistant", content: result.reply }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בשליחת ההודעה.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-md border border-border bg-surface/60">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <span className="text-xs font-bold text-foreground">
+          שיחה עם {agentName} · {candidateName}
+        </span>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMessages(() => [])}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            נקה שיחה
+          </button>
+        )}
+      </div>
+
+      <div ref={scrollRef} className="max-h-72 overflow-y-auto px-3 py-2 text-sm">
+        {messages.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            התחל שיחה עם הסוכן בנוגע ל{candidateName}.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {messages.map((m, i) => (
+              <li
+                key={i}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-6 ${
+                    m.role === "user"
+                      ? "bg-primary/15 text-foreground"
+                      : "bg-surface-strong text-foreground"
+                  }`}
+                >
+                  <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {m.role === "user" ? "אתה" : agentName}
+                  </div>
+                  {m.content}
+                </div>
+              </li>
+            ))}
+            {isSending && (
+              <li className="flex justify-start">
+                <div className="rounded-md bg-surface-strong px-3 py-2 text-xs text-muted-foreground">
+                  {agentName} כותב...
+                </div>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+
+      {error && (
+        <div className="border-t border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-2 border-t border-border p-2">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="כתוב הודעה לסוכן..."
+          rows={2}
+          disabled={isSending || !canEdit}
+          className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+        />
+        <Button
+          variant="command"
+          onClick={() => void send()}
+          disabled={isSending || !input.trim() || !canEdit}
+        >
+          {isSending ? "שולח..." : "שלח"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function AgentShell({
   name,
   icon: Icon,
