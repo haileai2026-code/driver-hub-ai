@@ -232,6 +232,16 @@ export type ReminderFailureReason = {
   entries: ReminderFailureEntry[];
 };
 
+export type ReminderDelayCorrelation = {
+  reason: string;
+  failureCount: number;
+  retryCount: number; // additional sends to same candidate after failure
+  avgRetryGapMs: number | null; // avg time from failure -> next send to same candidate
+  avgDeliveryDelayMs: number | null; // avg sent->delivered for related messages
+  delayedDeliveries: number; // # related messages whose sent->delivered exceeded threshold
+  delayThresholdMs: number;
+};
+
 export type ReminderStats = {
   totalSent: number;
   totalDelivered: number;
@@ -241,6 +251,7 @@ export type ReminderStats = {
   deliveryRate: number; // 0..1 — delivered / sent
   daily: ReminderDailyPoint[];
   failureReasons: ReminderFailureReason[];
+  delayCorrelations: ReminderDelayCorrelation[];
 };
 
 function extractFailureReason(notes: string | null): string {
