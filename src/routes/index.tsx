@@ -1441,15 +1441,7 @@ function AgentsPage({
 
   return (
     <div className="space-y-4">
-      <Panel
-        title="מרכז הפעלה לכל הסוכנים"
-        action={
-          <Button variant="command" onClick={onCheckConnections} disabled={isCheckingAgents}>
-            <ShieldCheck className="h-4 w-4" />{" "}
-            {isCheckingAgents ? "בודק חיבורים..." : "בדוק זמינות סוכנים"}
-          </Button>
-        }
-      >
+      <Panel title="מרכז הפעלה לכל הסוכנים">
         <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
           <label className="block text-sm">
             <span className="mb-1 block font-bold">בחר מועמד פעיל לכל הסוכנים</span>
