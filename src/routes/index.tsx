@@ -298,6 +298,14 @@ function HaileApp() {
     setSystemUsers(result.users ?? []);
     setSelectedId((current) => current ?? normalized[0]?.id ?? null);
     setIsLoadingData(false);
+
+    setIsLoadingReminderStats(true);
+    try {
+      const statsResult = await loadReminderStats({ data: { accessToken, days: 14 } });
+      if (statsResult.ok) setReminderStats(statsResult.stats);
+    } finally {
+      setIsLoadingReminderStats(false);
+    }
   };
 
   const selected =
