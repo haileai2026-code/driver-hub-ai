@@ -948,7 +948,11 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && (
-              <SettingsPage onExport={exportCandidates} isSuperAdmin={isSuperAdmin} />
+              <SettingsPage
+                onExport={exportCandidates}
+                isSuperAdmin={isSuperAdmin}
+                agentStatuses={agentStatuses}
+              />
             )}
             {activePage === "admin" && isSuperAdmin && (
               <AdminUsersPage users={systemUsers} onInvite={handleInvite} status={actionStatus} />
