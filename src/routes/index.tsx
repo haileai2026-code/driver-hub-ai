@@ -2439,9 +2439,42 @@ function ReportsPage() {
 }
 
 function ConnectionStatusList({ statuses }: { statuses: AutomationAgentStatus[] }) {
-  const list = statuses.length ? statuses : defaultAgentStatuses();
+  const [liveStatuses, setLiveStatuses] = useState<AutomationAgentStatus[]>(statuses);
+  const [loading, setLoading] = useState(statuses.length === 0);
+
+  useEffect(() => {
+    if (statuses.length > 0) {
+      setLiveStatuses(statuses);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+      const result = await checkAutomationAgents({ data: { accessToken } });
+      if (cancelled) return;
+      if (result.ok && result.statuses.length > 0) {
+        setLiveStatuses(result.statuses);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [statuses]);
+
+  const list = liveStatuses.length ? liveStatuses : defaultAgentStatuses();
+
   return (
     <div className="flex flex-col gap-2">
+      {loading && (
+        <p className="text-xs text-muted-foreground">בודק חיבורים...</p>
+      )}
       {list.map((status) => (
         <div
           key={status.key}
