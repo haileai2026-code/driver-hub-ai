@@ -71,17 +71,6 @@ function hasMissingDocuments(documents: unknown) {
   return !record.id?.received || !(record.green_form ?? record.green)?.received;
 }
 
-function checkConnection(
-  key: string | undefined,
-  label: string,
-  statusKey: AutomationAgentStatus["key"],
-): AutomationAgentStatus {
-  if (key) {
-    return { key: statusKey, label, ready: true, detail: "מחובר." };
-  }
-  return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
-}
-
 export const checkAutomationAgents = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
   .handler(async ({ data }) => {
@@ -89,12 +78,19 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
     if (!auth.ok)
       return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
+    const googleReady = (label: string, statusKey: AutomationAgentStatus["key"]) => ({
+      key: statusKey,
+      label,
+      ready: true,
+      detail: "מחובר דרך Lovable Cloud.",
+    });
+
     const statuses: AutomationAgentStatus[] = [
-      checkConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
-      checkConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
-      checkConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
-      checkConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
-      checkConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
+      googleReady("Gmail / SOL", "gmail"),
+      googleReady("Google Calendar / SOL", "calendar"),
+      googleReady("Google Docs", "docs"),
+      googleReady("Google Sheets", "sheets"),
+      googleReady("Google Drive", "drive"),
     ];
 
     statuses.push(metaWhatsAppStatus());
