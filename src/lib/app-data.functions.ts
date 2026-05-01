@@ -202,3 +202,174 @@ export const deleteCandidate = createServerFn({ method: "POST" })
     }
     return { ok: true as const, message: "המועמד נמחק." };
   });
+
+const ReminderStatsSchema = AccessTokenSchema.extend({
+  days: z.number().int().min(1).max(60).optional(),
+});
+
+export type ReminderDailyPoint = {
+  date: string; // YYYY-MM-DD
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+};
+
+export type ReminderFailureReason = {
+  reason: string;
+  count: number;
+};
+
+export type ReminderStats = {
+  totalSent: number;
+  totalDelivered: number;
+  totalRead: number;
+  totalFailed: number;
+  successRate: number; // 0..1 — sent / (sent + failed)
+  deliveryRate: number; // 0..1 — delivered / sent
+  daily: ReminderDailyPoint[];
+  failureReasons: ReminderFailureReason[];
+};
+
+function extractFailureReason(notes: string | null): string {
+  if (!notes) return "לא צוינה סיבה";
+  // Format from automation/webhook: "[נכשל <ts>] <reason> | <body>"
+  const match = notes.match(/\[נכשל[^\]]*\]\s*([^|]+)/);
+  const raw = match?.[1]?.trim() ?? notes.trim();
+  // Normalize HTTP status / common patterns to keep buckets tight
+  const httpMatch = raw.match(/HTTP\s*(\d{3})/i);
+  if (httpMatch) return `HTTP ${httpMatch[1]}`;
+  // Trim very long reasons
+  return raw.length > 120 ? `${raw.slice(0, 117)}…` : raw;
+}
+
+export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => ReminderStatsSchema.parse(input))
+  .handler(async ({ data }) => {
+    const auth = await getAuthorizedUser(data.accessToken, [
+      "super_admin",
+      "operator",
+      "viewer",
+    ]);
+    if (!auth.ok)
+      return {
+        ok: false as const,
+        message: auth.message,
+        stats: null as ReminderStats | null,
+      };
+
+    const days = data.days ?? 14;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("operation_logs")
+      .select("interaction_type,notes_hebrew,created_at")
+      .gte("created_at", since)
+      .in("interaction_type", [
+        "whatsapp_reminder_sent",
+        "whatsapp_reminder_failed",
+        "whatsapp_status_sent",
+        "whatsapp_status_delivered",
+        "whatsapp_status_read",
+        "whatsapp_status_failed",
+        "whatsapp_reply_sent",
+        "whatsapp_reply_failed",
+      ])
+      .order("created_at", { ascending: true })
+      .limit(2000);
+
+    if (error) {
+      console.error("[reminder-stats] db error", error);
+      return {
+        ok: false as const,
+        message: "טעינת סטטיסטיקת תזכורות נכשלה.",
+        stats: null,
+      };
+    }
+
+    const buckets = new Map<string, ReminderDailyPoint>();
+    // Seed every day in range so the chart shows continuous bars
+    for (let i = days - 1; i >= 0; i -= 1) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      buckets.set(key, { date: key, sent: 0, delivered: 0, read: 0, failed: 0 });
+    }
+
+    let totalSent = 0;
+    let totalDelivered = 0;
+    let totalRead = 0;
+    let totalFailed = 0;
+    const reasons = new Map<string, number>();
+
+    for (const row of rows ?? []) {
+      const dayKey = (row.created_at ?? "").slice(0, 10);
+      const bucket =
+        buckets.get(dayKey) ??
+        (() => {
+          const seeded: ReminderDailyPoint = {
+            date: dayKey,
+            sent: 0,
+            delivered: 0,
+            read: 0,
+            failed: 0,
+          };
+          buckets.set(dayKey, seeded);
+          return seeded;
+        })();
+
+      switch (row.interaction_type) {
+        case "whatsapp_reminder_sent":
+        case "whatsapp_reply_sent":
+        case "whatsapp_status_sent":
+          bucket.sent += 1;
+          totalSent += 1;
+          break;
+        case "whatsapp_status_delivered":
+          bucket.delivered += 1;
+          totalDelivered += 1;
+          break;
+        case "whatsapp_status_read":
+          bucket.read += 1;
+          totalRead += 1;
+          break;
+        case "whatsapp_reminder_failed":
+        case "whatsapp_reply_failed":
+        case "whatsapp_status_failed": {
+          bucket.failed += 1;
+          totalFailed += 1;
+          const reason = extractFailureReason(row.notes_hebrew);
+          reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    const daily = Array.from(buckets.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+    const failureReasons = Array.from(reasons.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const sendAttempts = totalSent + totalFailed;
+    const successRate = sendAttempts > 0 ? totalSent / sendAttempts : 0;
+    const deliveryRate = totalSent > 0 ? totalDelivered / totalSent : 0;
+
+    return {
+      ok: true as const,
+      message: "OK",
+      stats: {
+        totalSent,
+        totalDelivered,
+        totalRead,
+        totalFailed,
+        successRate,
+        deliveryRate,
+        daily,
+        failureReasons,
+      } satisfies ReminderStats,
+    };
+  });
