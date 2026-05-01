@@ -747,6 +747,7 @@ function HaileApp() {
     await supabase.auth.signOut();
     setCandidates([]);
     setLogs([]);
+    setReminderStats(null);
     setAuthStatus("התנתקת מהמערכת.");
   };
 
