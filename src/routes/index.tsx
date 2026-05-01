@@ -1874,6 +1874,8 @@ function RecruiterAgentPanel({
       description="טוען פרופיל, מנסח הודעת פתיחה בשפת המועמד ומעדכן שלב"
       tone="primary"
       selected={selected}
+      agentKey="recruiter"
+      canEdit={canEdit}
     >
       <div className="space-y-3">
         <Button
@@ -2004,6 +2006,8 @@ function VoiceAgentPanel({
       description="שאלות סינון, ראיון קולי ודירוג A/B/C נשמר על המועמד"
       tone="success"
       selected={selected}
+      agentKey="voice"
+      canEdit={canEdit}
     >
       <div className="space-y-3">
         <Button variant="command" onClick={buildQuestions} disabled={!selected} className="w-full">
@@ -2138,6 +2142,8 @@ function CielAgentPanel({
       description="ניטור לידים פעילים, פעולות ממתינות ועדכוני סטטוס"
       tone="intel"
       selected={selected}
+      agentKey="ciel"
+      canEdit={canEdit}
     >
       <div className="space-y-3">
         <SettingsGrid
@@ -2224,6 +2230,8 @@ function SolAgentPanel({
       description="תזכורות, מעקבים ופעולות ממתינות"
       tone="warning"
       selected={selected}
+      agentKey="sol"
+      canEdit={canEdit}
     >
       <div className="space-y-3">
         <SettingsGrid
