@@ -2438,6 +2438,39 @@ function ReportsPage() {
   );
 }
 
+function ConnectionStatusList({ statuses }: { statuses: AutomationAgentStatus[] }) {
+  const list = statuses.length ? statuses : defaultAgentStatuses();
+  return (
+    <div className="flex flex-col gap-2">
+      {list.map((status) => (
+        <div
+          key={status.key}
+          className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2"
+        >
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-foreground">{status.label}</span>
+            <span className="text-xs text-muted-foreground">{status.detail}</span>
+          </div>
+          <span
+            className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+              status.ready
+                ? "bg-emerald-500/15 text-emerald-500"
+                : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                status.ready ? "bg-emerald-500" : "bg-destructive"
+              }`}
+            />
+            {status.ready ? "מחובר" : "לא מחובר"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SettingsPage({
   onExport,
   isSuperAdmin,
