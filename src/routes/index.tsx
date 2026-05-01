@@ -2236,13 +2236,7 @@ function SolPage({
         </div>
       </Panel>
       <Panel title="סיכום בוקר">
-        <SettingsGrid
-          items={[
-            "שעת שליחה: 07:30",
-            "WhatsApp לקבלה: לא הוגדר",
-            "תוכן: פגישות, מיילים דחופים, מועמדים חדשים",
-          ]}
-        />
+        <MorningSummarySettings />
       </Panel>
       <Panel title="מיילים דחופים">
         <EmptyState text="אין מיילים מסוננים להצגה כרגע." />
