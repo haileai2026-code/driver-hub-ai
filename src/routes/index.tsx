@@ -68,9 +68,11 @@ import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
 import {
   checkAutomationAgents,
+  getRecentIntegrationFailures,
   sendMissingDocsWhatsAppReminders,
   sendTestNotification,
   type AutomationAgentStatus,
+  type IntegrationFailure,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
 import { getAppSettings, saveAppSettings } from "@/lib/app-settings.functions";
