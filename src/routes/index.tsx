@@ -1553,6 +1553,8 @@ function AgentShell({
   description,
   tone,
   selected,
+  agentKey,
+  canEdit,
   children,
 }: {
   name: string;
@@ -1560,6 +1562,8 @@ function AgentShell({
   description: string;
   tone: "primary" | "success" | "intel" | "warning";
   selected: Candidate | null;
+  agentKey?: "recruiter" | "voice" | "ciel" | "sol";
+  canEdit?: boolean;
   children: ReactNode;
 }) {
   const iconTone =
@@ -1605,6 +1609,15 @@ function AgentShell({
         </div>
       )}
       {children}
+      {selected && agentKey && (
+        <AgentChat
+          agentKey={agentKey}
+          agentName={name}
+          candidateId={selected.id}
+          candidateName={selected.name}
+          canEdit={canEdit ?? false}
+        />
+      )}
     </article>
   );
 }
