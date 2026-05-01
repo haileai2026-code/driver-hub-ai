@@ -275,7 +275,7 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("operation_logs")
-      .select("interaction_type,notes_hebrew,created_at")
+      .select("id,interaction_type,notes_hebrew,created_at,candidate_id")
       .gte("created_at", since)
       .in("interaction_type", [
         "whatsapp_reminder_sent",
@@ -311,7 +311,8 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
     let totalDelivered = 0;
     let totalRead = 0;
     let totalFailed = 0;
-    const reasons = new Map<string, number>();
+    const reasonCounts = new Map<string, number>();
+    const reasonEntries = new Map<string, ReminderFailureEntry[]>();
 
     for (const row of rows ?? []) {
       const dayKey = (row.created_at ?? "").slice(0, 10);
@@ -350,7 +351,19 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
           bucket.failed += 1;
           totalFailed += 1;
           const reason = extractFailureReason(row.notes_hebrew);
-          reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+          reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+          const list = reasonEntries.get(reason) ?? [];
+          list.push({
+            id: row.id,
+            createdAt: row.created_at,
+            interactionType: row.interaction_type,
+            reason,
+            rawNotes: row.notes_hebrew ?? "",
+            candidateId: row.candidate_id ?? null,
+            candidateName: null,
+            candidatePhone: null,
+          });
+          reasonEntries.set(reason, list);
           break;
         }
         default:
@@ -358,11 +371,53 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
       }
     }
 
+    // Resolve candidate names/phones for the failure entries in one query
+    const candidateIds = Array.from(
+      new Set(
+        Array.from(reasonEntries.values())
+          .flat()
+          .map((entry) => entry.candidateId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    if (candidateIds.length > 0) {
+      const { data: candidateRows, error: candidateError } = await supabaseAdmin
+        .from("candidates")
+        .select("id,name,phone")
+        .in("id", candidateIds);
+
+      if (candidateError) {
+        console.error("[reminder-stats] candidate lookup error", candidateError);
+      } else {
+        const lookup = new Map(
+          (candidateRows ?? []).map((row) => [row.id, row]),
+        );
+        for (const list of reasonEntries.values()) {
+          for (const entry of list) {
+            if (!entry.candidateId) continue;
+            const candidate = lookup.get(entry.candidateId);
+            if (candidate) {
+              entry.candidateName = candidate.name ?? null;
+              entry.candidatePhone = candidate.phone ?? null;
+            }
+          }
+        }
+      }
+    }
+
     const daily = Array.from(buckets.values()).sort((a, b) =>
       a.date.localeCompare(b.date),
     );
-    const failureReasons = Array.from(reasons.entries())
-      .map(([reason, count]) => ({ reason, count }))
+    const failureReasons: ReminderFailureReason[] = Array.from(reasonCounts.entries())
+      .map(([reason, count]) => ({
+        reason,
+        count,
+        entries: (reasonEntries.get(reason) ?? [])
+          .slice()
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 25),
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
