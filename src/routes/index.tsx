@@ -2441,9 +2441,11 @@ function ReportsPage() {
 function SettingsPage({
   onExport,
   isSuperAdmin,
+  agentStatuses,
 }: {
   onExport: () => void;
   isSuperAdmin: boolean;
+  agentStatuses: AutomationAgentStatus[];
 }) {
   const [benyWhatsapp, setBenyWhatsapp] = useState("");
   const [summaryTime, setSummaryTime] = useState("08:00");
