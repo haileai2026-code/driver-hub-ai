@@ -71,17 +71,6 @@ function hasMissingDocuments(documents: unknown) {
   return !record.id?.received || !(record.green_form ?? record.green)?.received;
 }
 
-function checkConnection(
-  key: string | undefined,
-  label: string,
-  statusKey: AutomationAgentStatus["key"],
-): AutomationAgentStatus {
-  if (key) {
-    return { key: statusKey, label, ready: true, detail: "מחובר." };
-  }
-  return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
-}
-
 export const checkAutomationAgents = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
   .handler(async ({ data }) => {
