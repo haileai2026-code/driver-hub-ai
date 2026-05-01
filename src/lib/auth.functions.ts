@@ -50,7 +50,8 @@ export const createFirstSuperAdmin = createServerFn({ method: "POST" })
     });
 
     if (createError || !created.user) {
-      return { ok: false, message: createError?.message ?? "לא ניתן ליצור מנהל ראשי." };
+      console.error("[createFirstSuperAdmin] createUser failed", createError);
+      return { ok: false, message: "לא ניתן ליצור מנהל ראשי." };
     }
 
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
@@ -59,7 +60,8 @@ export const createFirstSuperAdmin = createServerFn({ method: "POST" })
     });
 
     if (roleError) {
-      return { ok: false, message: roleError.message };
+      console.error("[createFirstSuperAdmin] role insert failed", roleError);
+      return { ok: false, message: "לא ניתן ליצור מנהל ראשי." };
     }
 
     return { ok: true, message: "המנהל הראשי נוצר. אפשר להתחבר עכשיו." };
@@ -96,7 +98,8 @@ export const inviteSystemUser = createServerFn({ method: "POST" })
     });
 
     if (createError || !created.user) {
-      return { ok: false, message: createError?.message ?? "לא ניתן ליצור משתמש." };
+      console.error("[inviteSystemUser] createUser failed", createError);
+      return { ok: false, message: "לא ניתן ליצור משתמש." };
     }
 
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
@@ -105,7 +108,8 @@ export const inviteSystemUser = createServerFn({ method: "POST" })
     });
 
     if (roleError) {
-      return { ok: false, message: roleError.message };
+      console.error("[inviteSystemUser] role insert failed", roleError);
+      return { ok: false, message: "לא ניתן להקצות הרשאה." };
     }
 
     return { ok: true, message: `המשתמש נוצר עם הרשאת ${data.role.toUpperCase()}.` };

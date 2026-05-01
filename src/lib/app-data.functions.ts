@@ -79,10 +79,14 @@ export const getLiveAppData = createServerFn({ method: "POST" })
     ]);
 
     if (candidateResult.error || logResult.error || roleResult.error) {
+      console.error("[getLiveAppData] db error", {
+        candidate: candidateResult.error,
+        log: logResult.error,
+        role: roleResult.error,
+      });
       return {
         ok: false as const,
-        message:
-          candidateResult.error?.message ?? logResult.error?.message ?? roleResult.error?.message ?? "טעינת הנתונים נכשלה.",
+        message: "טעינת הנתונים נכשלה.",
         candidates: [],
         logs: [],
         users: [],
@@ -128,9 +132,11 @@ export const createCandidate = createServerFn({ method: "POST" })
       created_by: auth.userId,
     });
 
-    return error
-      ? { ok: false as const, message: error.message }
-      : { ok: true as const, message: "המועמד נשמר בהצלחה." };
+    if (error) {
+      console.error("[app-data] db error", error);
+      return { ok: false as const, message: "הפעולה נכשלה. אנא נסה שוב." };
+    }
+    return { ok: true as const, message: "המועמד נשמר בהצלחה." };
   });
 
 export const updateCandidate = createServerFn({ method: "POST" })
@@ -159,9 +165,11 @@ export const updateCandidate = createServerFn({ method: "POST" })
       .update(updatePayload as any)
       .eq("id", data.id);
 
-    return error
-      ? { ok: false as const, message: error.message }
-      : { ok: true as const, message: "פרטי המועמד עודכנו." };
+    if (error) {
+      console.error("[app-data] db error", error);
+      return { ok: false as const, message: "הפעולה נכשלה. אנא נסה שוב." };
+    }
+    return { ok: true as const, message: "פרטי המועמד עודכנו." };
   });
 
 export const updateCandidateStage = createServerFn({ method: "POST" })
@@ -174,9 +182,11 @@ export const updateCandidateStage = createServerFn({ method: "POST" })
       .from("candidates")
       .update({ stage: data.stage })
       .eq("id", data.id);
-    return error
-      ? { ok: false as const, message: error.message }
-      : { ok: true as const, message: "סטטוס המועמד עודכן." };
+    if (error) {
+      console.error("[app-data] db error", error);
+      return { ok: false as const, message: "הפעולה נכשלה. אנא נסה שוב." };
+    }
+    return { ok: true as const, message: "סטטוס המועמד עודכן." };
   });
 
 export const deleteCandidate = createServerFn({ method: "POST" })
@@ -186,7 +196,9 @@ export const deleteCandidate = createServerFn({ method: "POST" })
     if (!auth.ok) return { ok: false as const, message: auth.message };
 
     const { error } = await supabaseAdmin.from("candidates").delete().eq("id", data.id);
-    return error
-      ? { ok: false as const, message: error.message }
-      : { ok: true as const, message: "המועמד נמחק." };
+    if (error) {
+      console.error("[app-data] db error", error);
+      return { ok: false as const, message: "הפעולה נכשלה. אנא נסה שוב." };
+    }
+    return { ok: true as const, message: "המועמד נמחק." };
   });

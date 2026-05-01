@@ -99,9 +99,7 @@ export const importCandidatesFromRows = createServerFn({ method: "POST" })
       const { error: insertError } = await supabaseAdmin.from("candidates").insert(candidate);
       if (insertError) {
         console.error(`[candidate-import] Supabase insert error for row ${rowNumber}:`, insertError);
-        errors.push(
-          `שורה ${rowNumber}: ${insertError.message}${insertError.details ? ` | details: ${insertError.details}` : ""}${insertError.hint ? ` | hint: ${insertError.hint}` : ""}${insertError.code ? ` | code: ${insertError.code}` : ""}`,
-        );
+        errors.push(`שורה ${rowNumber}: ההכנסה נכשלה.`);
         skipped++;
         continue;
       }
