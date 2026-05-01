@@ -42,6 +42,21 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
             return json({ ok: false, error: "Beny WhatsApp not configured." }, 400);
           }
 
+          // Only send within a 5-minute window of the configured Asia/Jerusalem time.
+          const targetTime = (summary.time_il ?? "08:00").trim();
+          const nowIl = new Date().toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Jerusalem",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }); // "HH:MM"
+          const [th, tm] = targetTime.split(":").map(Number);
+          const [nh, nm] = nowIl.split(":").map(Number);
+          const diff = Math.abs((nh * 60 + nm) - (th * 60 + tm));
+          if (diff > 5) {
+            return json({ ok: true, skipped: `outside window (now ${nowIl}, target ${targetTime})` });
+          }
+
           // Build the morning summary
           const since = new Date();
           since.setHours(since.getHours() - 24);
