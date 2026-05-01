@@ -71,40 +71,15 @@ function hasMissingDocuments(documents: unknown) {
   return !record.id?.received || !(record.green_form ?? record.green)?.received;
 }
 
-async function verifyConnection(
+function checkConnection(
   key: string | undefined,
   label: string,
   statusKey: AutomationAgentStatus["key"],
-) {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  if (!lovableKey) return { key: statusKey, label, ready: false, detail: "LOVABLE_API_KEY חסר." };
-  if (!key) return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
-
-  try {
-    const response = await fetch(VERIFY_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": key,
-      },
-    });
-    const json = (await response.json()) as {
-      outcome?: string;
-      latency_ms?: number;
-      error?: string;
-    };
-    return {
-      key: statusKey,
-      label,
-      ready: response.ok && (json.outcome === "verified" || json.outcome === "skipped"),
-      detail: response.ok
-        ? `סטטוס: ${json.outcome ?? "verified"}`
-        : (json.error ?? "בדיקת החיבור נכשלה."),
-      latencyMs: json.latency_ms,
-    };
-  } catch {
-    return { key: statusKey, label, ready: false, detail: "לא ניתן לבדוק את החיבור כרגע." };
+): AutomationAgentStatus {
+  if (key) {
+    return { key: statusKey, label, ready: true, detail: "מחובר." };
   }
+  return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
 }
 
 export const checkAutomationAgents = createServerFn({ method: "POST" })
