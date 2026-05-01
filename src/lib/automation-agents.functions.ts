@@ -400,3 +400,74 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
       skipped,
     };
   });
+
+export type IntegrationFailure = {
+  id: string;
+  channel: "slack" | "telegram" | "whatsapp" | "other";
+  target: string;
+  message: string;
+  error: string;
+  createdAt: string;
+};
+
+function parseIntegrationFailureRow(row: {
+  id: string;
+  operator_name: string | null;
+  notes_hebrew: string | null;
+  translated_hebrew: string | null;
+  source_message: string | null;
+  created_at: string;
+}): IntegrationFailure {
+  const channelRaw = (row.operator_name ?? "").replace(/^Integration:/, "").trim();
+  const channel: IntegrationFailure["channel"] =
+    channelRaw === "slack" || channelRaw === "telegram" || channelRaw === "whatsapp"
+      ? channelRaw
+      : "other";
+  const notes = row.notes_hebrew ?? "";
+  // notes format: [נכשל <iso>] ערוץ <ch> → <target> | <error>
+  const arrowIdx = notes.indexOf("→");
+  let target = "";
+  let error = "";
+  if (arrowIdx >= 0) {
+    const tail = notes.slice(arrowIdx + 1).trim();
+    const pipeIdx = tail.indexOf("|");
+    if (pipeIdx >= 0) {
+      target = tail.slice(0, pipeIdx).trim();
+      error = tail.slice(pipeIdx + 1).trim();
+    } else {
+      target = tail;
+    }
+  }
+  return {
+    id: row.id,
+    channel,
+    target,
+    message: row.translated_hebrew ?? row.source_message ?? "",
+    error: error || "שגיאה לא מתועדת.",
+    createdAt: row.created_at,
+  };
+}
+
+export const getRecentIntegrationFailures = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
+  .handler(async ({ data }) => {
+    const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator", "viewer"]);
+    if (!auth.ok) return { ok: false as const, message: auth.message, failures: [] };
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("operation_logs")
+      .select("id,operator_name,notes_hebrew,translated_hebrew,source_message,created_at,interaction_type")
+      .in("interaction_type", [
+        "integration_test_failed",
+        "whatsapp_reminder_failed",
+        "whatsapp_status_failed",
+        "whatsapp_reply_failed",
+      ])
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) return { ok: false as const, message: error.message, failures: [] };
+
+    const failures = (rows ?? []).map(parseIntegrationFailureRow);
+    return { ok: true as const, failures };
+  });
