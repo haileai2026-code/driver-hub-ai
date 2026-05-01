@@ -2188,6 +2188,126 @@ function QuickCandidateForm({
   );
 }
 
+function MorningSummarySettings() {
+  const [phone, setPhone] = useState("");
+  const [savedPhone, setSavedPhone] = useState("");
+  const [time, setTime] = useState("08:00");
+  const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<{ kind: "idle" | "saving" | "ok" | "error"; message?: string }>({
+    kind: "idle",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+      const res = await getAppSettings({ data: { accessToken } });
+      if (cancelled) return;
+      if (res.ok) {
+        setPhone(res.settings.benyWhatsapp);
+        setSavedPhone(res.settings.benyWhatsapp);
+        setTime(res.settings.morningSummaryTime);
+        setEnabled(res.settings.morningSummaryEnabled);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setStatus({ kind: "saving" });
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setStatus({ kind: "error", message: "יש להתחבר מחדש." });
+      return;
+    }
+    const res = await saveAppSettings({
+      data: {
+        accessToken,
+        benyWhatsapp: phone,
+        morningSummaryTime: time,
+        morningSummaryEnabled: enabled,
+      },
+    });
+    if (res.ok) {
+      setSavedPhone(phone.replace(/[^\d+]/g, ""));
+      setStatus({ kind: "ok", message: res.message });
+    } else {
+      setStatus({ kind: "error", message: res.message });
+    }
+  };
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">טוען הגדרות...</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="rounded-md border border-border bg-background/60 p-3">
+        <div className="text-xs text-muted-foreground">WhatsApp לקבלה</div>
+        <div className="font-medium text-foreground" dir="ltr">
+          {savedPhone || "לא הוגדר"}
+        </div>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">מספר WhatsApp (כולל קידומת מדינה)</span>
+        <input
+          dir="ltr"
+          placeholder="+972501234567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">שעת שליחה (Asia/Jerusalem)</span>
+        <input
+          type="time"
+          dir="ltr"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="w-32 rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        />
+      </label>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+        />
+        <span>הפעל שליחת סיכום יומי</span>
+      </label>
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button variant="tactical" onClick={handleSave} disabled={status.kind === "saving"}>
+          {status.kind === "saving" ? "שומר..." : "שמור"}
+        </Button>
+        {status.message && (
+          <span
+            className={
+              status.kind === "error" ? "text-destructive text-xs" : "text-emerald-500 text-xs"
+            }
+          >
+            {status.message}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SolPage({
   selected,
   reminder,
@@ -2236,13 +2356,7 @@ function SolPage({
         </div>
       </Panel>
       <Panel title="סיכום בוקר">
-        <SettingsGrid
-          items={[
-            "שעת שליחה: 07:30",
-            "WhatsApp לקבלה: לא הוגדר",
-            "תוכן: פגישות, מיילים דחופים, מועמדים חדשים",
-          ]}
-        />
+        <MorningSummarySettings />
       </Panel>
       <Panel title="מיילים דחופים">
         <EmptyState text="אין מיילים מסוננים להצגה כרגע." />
