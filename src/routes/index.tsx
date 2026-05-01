@@ -871,6 +871,8 @@ function HaileApp() {
                 candidates={candidates}
                 logs={logs}
                 isLoading={isLoadingData}
+                reminderStats={reminderStats}
+                isLoadingReminderStats={isLoadingReminderStats}
                 onOpenCandidates={() => setActivePage("candidates")}
               />
             )}
