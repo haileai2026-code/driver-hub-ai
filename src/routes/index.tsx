@@ -1446,6 +1446,12 @@ function WhatsAppRemindersWidget({
         </div>
       </div>
 
+      <ReminderDelayCorrelations
+        correlations={stats.delayCorrelations}
+        onSelect={(reason) => setSelectedReason(reason)}
+        selectedReason={selectedReason}
+      />
+
       {activeReason && (
         <ReminderFailureDrilldown
           reason={activeReason}
