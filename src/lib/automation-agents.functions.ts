@@ -89,13 +89,13 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
     if (!auth.ok)
       return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
-    const statuses = await Promise.all([
-      verifyConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
-      verifyConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
-      verifyConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
-      verifyConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
-      verifyConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
-    ]);
+    const statuses: AutomationAgentStatus[] = [
+      checkConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
+      checkConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
+      checkConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
+      checkConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
+      checkConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
+    ];
 
     statuses.push(metaWhatsAppStatus());
 
