@@ -161,23 +161,40 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
         },
       );
 
+      const sentAt = new Date().toISOString();
+      const responseJson = (await response.json().catch(() => ({}))) as {
+        messages?: Array<{ id: string }>;
+        error?: { message?: string };
+      };
+
       if (response.ok) {
         sent += 1;
+        const messageId = responseJson.messages?.[0]?.id ?? "";
         await supabaseAdmin.from("operation_logs").insert({
           candidate_id: candidate.id,
           operator_name: "WhatsApp Automation Agent",
-          interaction_type: "whatsapp_reminder",
-          notes_hebrew: body,
+          interaction_type: "whatsapp_reminder_sent",
+          notes_hebrew: `[נשלח ${sentAt}] ${body}${messageId ? ` (msg id: ${messageId})` : ""}`,
           translated_hebrew: body,
           source_message: body,
           follow_up_required: true,
         });
         await supabaseAdmin
           .from("candidates")
-          .update({ last_contacted_at: new Date().toISOString() })
+          .update({ last_contacted_at: sentAt })
           .eq("id", candidate.id);
       } else {
         skipped += 1;
+        const errMsg = responseJson?.error?.message ?? `HTTP ${response.status}`;
+        await supabaseAdmin.from("operation_logs").insert({
+          candidate_id: candidate.id,
+          operator_name: "WhatsApp Automation Agent",
+          interaction_type: "whatsapp_reminder_failed",
+          notes_hebrew: `[נכשל ${sentAt}] ${errMsg} | ${body}`,
+          translated_hebrew: body,
+          source_message: body,
+          follow_up_required: true,
+        });
       }
     }
 
