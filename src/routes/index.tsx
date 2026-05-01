@@ -2396,6 +2396,20 @@ function SettingsPage({
             <p className="text-xs text-muted-foreground">
               מספר זה ישמש לסיכום הבוקר היומי דרך WhatsApp Business API.
             </p>
+            <div className="flex items-center gap-3 pt-1">
+              <Button variant="tactical" onClick={handleSave} disabled={status.kind === "saving"}>
+                {status.kind === "saving" ? "שומר..." : "שמור"}
+              </Button>
+              {status.message && (
+                <span
+                  className={
+                    status.kind === "error" ? "text-destructive text-xs" : "text-emerald-500 text-xs"
+                  }
+                >
+                  {status.message}
+                </span>
+              )}
+            </div>
           </div>
         ) : (
           <SettingsGrid items={["רק SUPER_ADMIN יכול לערוך הגדרות אלו."]} />
