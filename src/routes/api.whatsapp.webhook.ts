@@ -17,6 +17,14 @@ interface WaWebhookBody {
           type: string;
           text?: { body: string };
           id: string;
+          timestamp?: string;
+        }>;
+        statuses?: Array<{
+          id: string;
+          status: string; // sent | delivered | read | failed
+          timestamp?: string;
+          recipient_id?: string;
+          errors?: Array<{ title?: string; message?: string }>;
         }>;
       };
     }>;
