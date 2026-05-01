@@ -34,6 +34,7 @@ import {
   Phone,
   Search,
   Save,
+  Send,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
