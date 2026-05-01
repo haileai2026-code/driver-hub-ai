@@ -79,10 +79,14 @@ export const getLiveAppData = createServerFn({ method: "POST" })
     ]);
 
     if (candidateResult.error || logResult.error || roleResult.error) {
+      console.error("[getLiveAppData] db error", {
+        candidate: candidateResult.error,
+        log: logResult.error,
+        role: roleResult.error,
+      });
       return {
         ok: false as const,
-        message:
-          candidateResult.error?.message ?? logResult.error?.message ?? roleResult.error?.message ?? "טעינת הנתונים נכשלה.",
+        message: "טעינת הנתונים נכשלה.",
         candidates: [],
         logs: [],
         users: [],
