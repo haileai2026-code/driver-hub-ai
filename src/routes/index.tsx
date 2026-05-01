@@ -2583,15 +2583,7 @@ function SettingsPage({
       </Panel>
 
       <Panel title="חיבורים">
-        <SettingsGrid
-          items={[
-            "WhatsApp Business API (Meta Cloud)",
-            "Google Calendar OAuth",
-            "Gmail OAuth",
-            "Google Docs OAuth: מחובר",
-            "Google Sheets OAuth: מחובר",
-          ]}
-        />
+        <ConnectionStatusList statuses={agentStatuses} />
       </Panel>
 
       <Panel title="גיבוי נתונים">
