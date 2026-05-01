@@ -436,6 +436,154 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
     const successRate = sendAttempts > 0 ? totalSent / sendAttempts : 0;
     const deliveryRate = totalSent > 0 ? totalDelivered / totalSent : 0;
 
+    // ----- Correlate failure reasons with delivery delays / retries -----
+    // 1) Build a wamid -> {sentAt, deliveredAt} map from status logs and
+    //    reminder send logs (which embed "msg id: <wamid>" in notes_hebrew).
+    const WAMID_RE = /msg id:\s*([A-Za-z0-9._\-=:+/]+)/i;
+    type WamidTimeline = { sentAt?: number; deliveredAt?: number; candidateId: string | null };
+    const wamidTimeline = new Map<string, WamidTimeline>();
+
+    const upsertWamid = (
+      wamid: string,
+      patch: Partial<WamidTimeline> & { candidateId?: string | null },
+    ) => {
+      const existing = wamidTimeline.get(wamid) ?? { candidateId: patch.candidateId ?? null };
+      wamidTimeline.set(wamid, {
+        ...existing,
+        ...patch,
+        candidateId: existing.candidateId ?? patch.candidateId ?? null,
+      });
+    };
+
+    for (const row of rows ?? []) {
+      const tsMs = row.created_at ? new Date(row.created_at).getTime() : NaN;
+      if (!Number.isFinite(tsMs)) continue;
+
+      if (
+        row.interaction_type === "whatsapp_reminder_sent" ||
+        row.interaction_type === "whatsapp_reply_sent"
+      ) {
+        const m = row.notes_hebrew?.match(WAMID_RE);
+        if (m?.[1]) upsertWamid(m[1], { sentAt: tsMs, candidateId: row.candidate_id ?? null });
+      } else if (row.interaction_type === "whatsapp_status_sent" && row.source_message) {
+        upsertWamid(row.source_message, {
+          sentAt: tsMs,
+          candidateId: row.candidate_id ?? null,
+        });
+      } else if (
+        row.interaction_type === "whatsapp_status_delivered" &&
+        row.source_message
+      ) {
+        upsertWamid(row.source_message, {
+          deliveredAt: tsMs,
+          candidateId: row.candidate_id ?? null,
+        });
+      }
+    }
+
+    // 2) Per-candidate timeline of sends (so we can detect retries after a failure).
+    type SendEvent = { ts: number; candidateId: string };
+    const sendsByCandidate = new Map<string, number[]>();
+    for (const row of rows ?? []) {
+      if (
+        row.candidate_id &&
+        (row.interaction_type === "whatsapp_reminder_sent" ||
+          row.interaction_type === "whatsapp_reply_sent")
+      ) {
+        const tsMs = new Date(row.created_at).getTime();
+        if (!Number.isFinite(tsMs)) continue;
+        const arr = sendsByCandidate.get(row.candidate_id) ?? [];
+        arr.push(tsMs);
+        sendsByCandidate.set(row.candidate_id, arr);
+      }
+    }
+    for (const arr of sendsByCandidate.values()) arr.sort((a, b) => a - b);
+
+    const DELAY_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+    const correlationMap = new Map<
+      string,
+      {
+        failureCount: number;
+        retryCount: number;
+        retryGaps: number[];
+        deliveryDelays: number[];
+        delayedDeliveries: number;
+      }
+    >();
+
+    for (const [reason, entries] of reasonEntries.entries()) {
+      const slot = {
+        failureCount: entries.length,
+        retryCount: 0,
+        retryGaps: [] as number[],
+        deliveryDelays: [] as number[],
+        delayedDeliveries: 0,
+      };
+
+      for (const entry of entries) {
+        const failureTs = new Date(entry.createdAt).getTime();
+        if (!Number.isFinite(failureTs)) continue;
+
+        // Retry detection: count sends to this candidate strictly AFTER the failure
+        if (entry.candidateId) {
+          const sends = sendsByCandidate.get(entry.candidateId) ?? [];
+          const nextSend = sends.find((ts) => ts > failureTs);
+          const retriesAfter = sends.filter((ts) => ts > failureTs).length;
+          slot.retryCount += retriesAfter;
+          if (nextSend) slot.retryGaps.push(nextSend - failureTs);
+
+          // Delivery delay: any wamid for this candidate where sentAt > failureTs
+          // and we have a deliveredAt — measures how long retries took to land.
+          for (const timeline of wamidTimeline.values()) {
+            if (
+              timeline.candidateId === entry.candidateId &&
+              timeline.sentAt &&
+              timeline.deliveredAt &&
+              timeline.sentAt > failureTs
+            ) {
+              const delay = timeline.deliveredAt - timeline.sentAt;
+              slot.deliveryDelays.push(delay);
+              if (delay >= DELAY_THRESHOLD_MS) slot.delayedDeliveries += 1;
+            }
+          }
+        }
+      }
+
+      correlationMap.set(reason, slot);
+    }
+
+    const avg = (arr: number[]) =>
+      arr.length === 0 ? null : Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+
+    const delayCorrelations: ReminderDelayCorrelation[] = Array.from(
+      correlationMap.entries(),
+    )
+      .map(([reason, slot]) => ({
+        reason,
+        failureCount: slot.failureCount,
+        retryCount: slot.retryCount,
+        avgRetryGapMs: avg(slot.retryGaps),
+        avgDeliveryDelayMs: avg(slot.deliveryDelays),
+        delayedDeliveries: slot.delayedDeliveries,
+        delayThresholdMs: DELAY_THRESHOLD_MS,
+      }))
+      // Surface reasons that actually correlate with retries or delays
+      .filter(
+        (c) =>
+          c.retryCount > 0 ||
+          (c.avgDeliveryDelayMs ?? 0) > 0 ||
+          c.delayedDeliveries > 0,
+      )
+      .sort((a, b) => {
+        // Rank by delayed deliveries, then retry count, then avg delay
+        if (b.delayedDeliveries !== a.delayedDeliveries)
+          return b.delayedDeliveries - a.delayedDeliveries;
+        if (b.retryCount !== a.retryCount) return b.retryCount - a.retryCount;
+        return (b.avgDeliveryDelayMs ?? 0) - (a.avgDeliveryDelayMs ?? 0);
+      })
+      .slice(0, 5);
+
     return {
       ok: true as const,
       message: "OK",
@@ -448,6 +596,7 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
         deliveryRate,
         daily,
         failureReasons,
+        delayCorrelations,
       } satisfies ReminderStats,
     };
   });
