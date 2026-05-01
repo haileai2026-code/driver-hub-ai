@@ -202,6 +202,8 @@ function HaileApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
+  const [reminderStats, setReminderStats] = useState<ReminderStats | null>(null);
+  const [isLoadingReminderStats, setIsLoadingReminderStats] = useState(false);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
