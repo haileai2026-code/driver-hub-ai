@@ -286,7 +286,7 @@ export const getWhatsAppReminderStats = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("operation_logs")
-      .select("id,interaction_type,notes_hebrew,created_at,candidate_id")
+      .select("id,interaction_type,notes_hebrew,created_at,candidate_id,source_message")
       .gte("created_at", since)
       .in("interaction_type", [
         "whatsapp_reminder_sent",
