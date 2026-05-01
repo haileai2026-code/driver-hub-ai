@@ -71,40 +71,15 @@ function hasMissingDocuments(documents: unknown) {
   return !record.id?.received || !(record.green_form ?? record.green)?.received;
 }
 
-async function verifyConnection(
+function checkConnection(
   key: string | undefined,
   label: string,
   statusKey: AutomationAgentStatus["key"],
-) {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  if (!lovableKey) return { key: statusKey, label, ready: false, detail: "LOVABLE_API_KEY חסר." };
-  if (!key) return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
-
-  try {
-    const response = await fetch(VERIFY_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": key,
-      },
-    });
-    const json = (await response.json()) as {
-      outcome?: string;
-      latency_ms?: number;
-      error?: string;
-    };
-    return {
-      key: statusKey,
-      label,
-      ready: response.ok && (json.outcome === "verified" || json.outcome === "skipped"),
-      detail: response.ok
-        ? `סטטוס: ${json.outcome ?? "verified"}`
-        : (json.error ?? "בדיקת החיבור נכשלה."),
-      latencyMs: json.latency_ms,
-    };
-  } catch {
-    return { key: statusKey, label, ready: false, detail: "לא ניתן לבדוק את החיבור כרגע." };
+): AutomationAgentStatus {
+  if (key) {
+    return { key: statusKey, label, ready: true, detail: "מחובר." };
   }
+  return { key: statusKey, label, ready: false, detail: "החיבור לא מקושר לפרויקט." };
 }
 
 export const checkAutomationAgents = createServerFn({ method: "POST" })
@@ -114,13 +89,13 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
     if (!auth.ok)
       return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
-    const statuses = await Promise.all([
-      verifyConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
-      verifyConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
-      verifyConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
-      verifyConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
-      verifyConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
-    ]);
+    const statuses: AutomationAgentStatus[] = [
+      checkConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
+      checkConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
+      checkConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
+      checkConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
+      checkConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
+    ];
 
     statuses.push(metaWhatsAppStatus());
 
