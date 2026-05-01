@@ -1545,7 +1545,117 @@ function ReminderFailureDrilldown({
   );
 }
 
-function CandidatesPage({
+function formatDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  if (ms < 1000) return `${ms} מ״ש`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} שנ׳`;
+  const minutes = Math.floor(seconds / 60);
+  const remSec = seconds % 60;
+  if (minutes < 60) return remSec ? `${minutes}:${String(remSec).padStart(2, "0")} ד׳` : `${minutes} ד׳`;
+  const hours = Math.floor(minutes / 60);
+  const remMin = minutes % 60;
+  return remMin ? `${hours}:${String(remMin).padStart(2, "0")} שע׳` : `${hours} שע׳`;
+}
+
+function ReminderDelayCorrelations({
+  correlations,
+  onSelect,
+  selectedReason,
+}: {
+  correlations: ReminderDelayCorrelation[];
+  onSelect: (reason: string) => void;
+  selectedReason: string | null;
+}) {
+  return (
+    <section className="mt-5 rounded-md border border-border bg-surface">
+      <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">
+            מתאם בין סיבות כישלון לעיכובי Webhook ושליחות חוזרות
+          </h3>
+          <p className="text-[11px] text-muted-foreground">
+            מבוסס על שליחות חוזרות לאותו מועמד ועיכוב בין שליחה למסירה (סף עיכוב: 5 ד׳).
+          </p>
+        </div>
+        <CalendarClock className="h-4 w-4 text-primary" />
+      </header>
+
+      {correlations.length === 0 ? (
+        <EmptyState text="אין כרגע סיבות כישלון שמשפיעות על עיכובים או שליחות חוזרות." />
+      ) : (
+        <div className="overflow-auto">
+          <table className="w-full text-right text-xs">
+            <thead className="bg-surface text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 font-medium">סיבה</th>
+                <th className="px-3 py-2 font-medium">כשלים</th>
+                <th className="px-3 py-2 font-medium">שליחות חוזרות</th>
+                <th className="px-3 py-2 font-medium">זמן עד נסיון חוזר (ממוצע)</th>
+                <th className="px-3 py-2 font-medium">עיכוב מסירה (ממוצע)</th>
+                <th className="px-3 py-2 font-medium">מסירות איטיות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {correlations.map((row) => {
+                const isSelected = row.reason === selectedReason;
+                const slowRatio = row.failureCount
+                  ? Math.round((row.delayedDeliveries / row.failureCount) * 100)
+                  : 0;
+                return (
+                  <tr
+                    key={row.reason}
+                    className={cn(
+                      "cursor-pointer border-b border-border/50 last:border-0 hover:bg-primary/5",
+                      isSelected && "bg-primary/5",
+                    )}
+                    onClick={() => onSelect(row.reason)}
+                  >
+                    <td className="max-w-[220px] truncate px-3 py-2 font-medium text-foreground" title={row.reason}>
+                      {row.reason}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{row.failureCount}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[11px] font-bold",
+                          row.retryCount > 0
+                            ? "bg-warning/15 text-warning"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {row.retryCount}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatDuration(row.avgRetryGapMs)}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatDuration(row.avgDeliveryDelayMs)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[11px] font-bold",
+                          row.delayedDeliveries > 0
+                            ? "bg-destructive/15 text-destructive"
+                            : "bg-success/15 text-success",
+                        )}
+                      >
+                        {row.delayedDeliveries}
+                        {row.failureCount > 0 ? ` · ${slowRatio}%` : ""}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
   candidates,
   selected,
   searchTerm,
