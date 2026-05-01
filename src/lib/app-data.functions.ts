@@ -215,9 +215,21 @@ export type ReminderDailyPoint = {
   failed: number;
 };
 
+export type ReminderFailureEntry = {
+  id: string;
+  createdAt: string;
+  interactionType: string;
+  reason: string;
+  rawNotes: string;
+  candidateId: string | null;
+  candidateName: string | null;
+  candidatePhone: string | null;
+};
+
 export type ReminderFailureReason = {
   reason: string;
   count: number;
+  entries: ReminderFailureEntry[];
 };
 
 export type ReminderStats = {
