@@ -245,6 +245,7 @@ function HaileApp() {
   const editCandidateRow = useServerFn(updateCandidate);
   const updateStage = useServerFn(updateCandidateStage);
   const removeCandidateRow = useServerFn(deleteCandidate);
+  const loadReminderStats = useServerFn(getWhatsAppReminderStats);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
