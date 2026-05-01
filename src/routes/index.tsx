@@ -64,6 +64,7 @@ import {
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
+import { getAppSettings, saveAppSettings } from "@/lib/app-settings.functions";
 import { CITY_OPTIONS, CITY_LABELS_HE, cityLabel, type CityOption, normalizeCityValue } from "@/lib/cities";
 
 export const Route = createFileRoute("/")({
@@ -946,7 +947,9 @@ function HaileApp() {
             )}
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
-            {activePage === "settings" && <SettingsPage onExport={exportCandidates} />}
+            {activePage === "settings" && (
+              <SettingsPage onExport={exportCandidates} isSuperAdmin={isSuperAdmin} />
+            )}
             {activePage === "admin" && isSuperAdmin && (
               <AdminUsersPage users={systemUsers} onInvite={handleInvite} status={actionStatus} />
             )}
@@ -2317,34 +2320,146 @@ function ReportsPage() {
   );
 }
 
-function SettingsPage({ onExport }: { onExport: () => void }) {
+function SettingsPage({
+  onExport,
+  isSuperAdmin,
+}: {
+  onExport: () => void;
+  isSuperAdmin: boolean;
+}) {
+  const [benyWhatsapp, setBenyWhatsapp] = useState("");
+  const [summaryTime, setSummaryTime] = useState("08:00");
+  const [summaryEnabled, setSummaryEnabled] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ kind: "idle" | "saving" | "ok" | "error"; message?: string }>({
+    kind: "idle",
+  });
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) return;
+      const res = await getAppSettings({ data: { accessToken } });
+      if (cancelled || !res.ok) return;
+      setBenyWhatsapp(res.settings.benyWhatsapp);
+      setSummaryTime(res.settings.morningSummaryTime);
+      setSummaryEnabled(res.settings.morningSummaryEnabled);
+      setUpdatedAt(res.settings.updatedAt);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin]);
+
+  const handleSave = async () => {
+    setStatus({ kind: "saving" });
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setStatus({ kind: "error", message: "יש להתחבר מחדש." });
+      return;
+    }
+    const res = await saveAppSettings({
+      data: {
+        accessToken,
+        benyWhatsapp,
+        morningSummaryTime: summaryTime,
+        morningSummaryEnabled: summaryEnabled,
+      },
+    });
+    if (res.ok) {
+      setStatus({ kind: "ok", message: res.message });
+      setUpdatedAt(new Date().toISOString());
+    } else {
+      setStatus({ kind: "error", message: res.message });
+    }
+  };
+
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <Panel title="פרופיל מנכ״ל">
-        <SettingsGrid items={["שם: בני אספה", "מייל: לא הוגדר", "טלפון WhatsApp: לא הוגדר"]} />
+      <Panel title="פרופיל מנכ״ל – בני אספה">
+        {isSuperAdmin ? (
+          <div className="flex flex-col gap-3 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground">טלפון WhatsApp (כולל קידומת מדינה)</span>
+              <input
+                dir="ltr"
+                placeholder="+972501234567"
+                value={benyWhatsapp}
+                onChange={(e) => setBenyWhatsapp(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              מספר זה ישמש לסיכום הבוקר היומי דרך WhatsApp Business API.
+            </p>
+          </div>
+        ) : (
+          <SettingsGrid items={["רק SUPER_ADMIN יכול לערוך הגדרות אלו."]} />
+        )}
       </Panel>
+
+      <Panel title="סיכום בוקר אוטומטי">
+        {isSuperAdmin ? (
+          <div className="flex flex-col gap-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={summaryEnabled}
+                onChange={(e) => setSummaryEnabled(e.target.checked)}
+              />
+              <span>הפעל שליחת סיכום יומי</span>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground">שעת שליחה (Asia/Jerusalem)</span>
+              <input
+                type="time"
+                dir="ltr"
+                value={summaryTime}
+                onChange={(e) => setSummaryTime(e.target.value)}
+                className="w-32 rounded-md border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <div className="flex items-center gap-3 pt-2">
+              <Button variant="tactical" onClick={handleSave} disabled={status.kind === "saving"}>
+                {status.kind === "saving" ? "שומר..." : "שמור הגדרות"}
+              </Button>
+              {status.message && (
+                <span
+                  className={
+                    status.kind === "error" ? "text-destructive text-xs" : "text-emerald-500 text-xs"
+                  }
+                >
+                  {status.message}
+                </span>
+              )}
+            </div>
+            {updatedAt && (
+              <p className="text-xs text-muted-foreground">
+                עודכן לאחרונה: {new Date(updatedAt).toLocaleString("he-IL")}
+              </p>
+            )}
+          </div>
+        ) : (
+          <SettingsGrid items={["רק SUPER_ADMIN רואה את הגדרות הסיכום."]} />
+        )}
+      </Panel>
+
       <Panel title="חיבורים">
         <SettingsGrid
           items={[
-            "WhatsApp Business API",
-            "Twilio SMS/Voice",
+            "WhatsApp Business API (Meta Cloud)",
             "Google Calendar OAuth",
             "Gmail OAuth",
             "Google Docs OAuth: מחובר",
             "Google Sheets OAuth: מחובר",
-            "Claude API Key",
           ]}
         />
       </Panel>
-      <Panel title="הגדרות מערכת">
-        <SettingsGrid
-          items={[
-            "שעת סיכום בוקר: 07:30",
-            "יעד מענה ללידים: 60 שניות",
-            "שפות פעילות: עברית, אמהרית, רוסית, ערבית, צרפתית, אנגלית",
-          ]}
-        />
-      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
