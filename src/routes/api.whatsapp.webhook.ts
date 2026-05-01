@@ -80,7 +80,7 @@ async function handleCommand(text: string): Promise<string> {
       .select("name,stage")
       .order("created_at", { ascending: false });
 
-    if (error) return `שגיאה: ${error.message}`;
+    if (error) return (console.error("[whatsapp webhook] db error", error), "שגיאה בשליפת הנתונים");
     if (!data?.length) return "אין מועמדים במערכת.";
 
     const lines = data.map((c) => `• ${c.name} — ${c.stage}`);
@@ -100,7 +100,7 @@ async function handleCommand(text: string): Promise<string> {
       .gte("created_at", from)
       .order("created_at", { ascending: false });
 
-    if (error) return `שגיאה: ${error.message}`;
+    if (error) return (console.error("[whatsapp webhook] db error", error), "שגיאה בשליפת הנתונים");
     if (!data?.length) return "אין מועמדים חדשים היום.";
 
     const lines = data.map((c) => `• ${c.name} — ${c.stage}`);
@@ -112,7 +112,7 @@ async function handleCommand(text: string): Promise<string> {
       .from("candidates")
       .select("stage");
 
-    if (error) return `שגיאה: ${error.message}`;
+    if (error) return (console.error("[whatsapp webhook] db error", error), "שגיאה בשליפת הנתונים");
 
     const counts = (data ?? []).reduce<Record<string, number>>((acc, r) => {
       const s = (r as { stage: string }).stage ?? "לא ידוע";
