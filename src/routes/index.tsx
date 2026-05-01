@@ -3283,6 +3283,10 @@ function SettingsPage({
         <IntegrationTester isSuperAdmin={isSuperAdmin} />
       </Panel>
 
+      <Panel title="WhatsApp — תבניות סטטוס ושפה">
+        <WhatsAppSenderSettings isSuperAdmin={isSuperAdmin} defaultPhone={benyWhatsapp} />
+      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
