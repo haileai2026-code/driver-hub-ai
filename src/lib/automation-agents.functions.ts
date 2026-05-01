@@ -10,7 +10,7 @@ const AccessTokenSchema = z.object({
 type AppRole = "super_admin" | "operator" | "viewer";
 
 export type AutomationAgentStatus = {
-  key: "gmail" | "calendar" | "docs" | "sheets" | "drive" | "twilio_whatsapp" | "haile_ai";
+  key: "gmail" | "calendar" | "docs" | "sheets" | "drive" | "meta_whatsapp" | "haile_ai";
   label: string;
   ready: boolean;
   detail: string;
@@ -18,7 +18,7 @@ export type AutomationAgentStatus = {
 };
 
 const VERIFY_URL = "https://connector-gateway.lovable.dev/api/v1/verify_credentials";
-const TWILIO_GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
+const META_API_VERSION = "v21.0";
 
 async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
   const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
@@ -39,18 +39,30 @@ async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
   return { ok: true as const, userId: userData.user.id, role };
 }
 
-function normalizeWhatsAppPhone(phone: string | null) {
+function normalizeMetaPhone(phone: string | null) {
   if (!phone) return "";
-  const cleaned = phone.replace(/[^+\d]/g, "");
-  if (cleaned.startsWith("+")) return `whatsapp:${cleaned}`;
-  if (cleaned.startsWith("0")) return `whatsapp:+972${cleaned.slice(1)}`;
-  return `whatsapp:${cleaned}`;
+  const digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
+  return digits;
 }
 
-function twilioFromNumber() {
-  const from = process.env.TWILIO_WHATSAPP_FROM ?? process.env.TWILIO_FROM_WHATSAPP ?? "";
-  if (!from) return "";
-  return from.startsWith("whatsapp:") ? from : `whatsapp:${from}`;
+function metaWhatsAppStatus(): AutomationAgentStatus {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (token && phoneId) {
+    return {
+      key: "meta_whatsapp",
+      label: "Meta WhatsApp Cloud API",
+      ready: true,
+      detail: "מחובר דרך Meta Cloud API.",
+    };
+  }
+  return {
+    key: "meta_whatsapp",
+    label: "Meta WhatsApp Cloud API",
+    ready: false,
+    detail: "חסרים WHATSAPP_ACCESS_TOKEN או WHATSAPP_PHONE_NUMBER_ID.",
+  };
 }
 
 function hasMissingDocuments(documents: unknown) {
@@ -108,8 +120,9 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
       verifyConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
       verifyConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
       verifyConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
-      verifyConnection(process.env.TWILIO_API_KEY, "Twilio WhatsApp", "twilio_whatsapp"),
     ]);
+
+    statuses.push(metaWhatsAppStatus());
 
     statuses.push({
       key: "haile_ai",
@@ -117,12 +130,6 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
       ready: Boolean(process.env.LOVABLE_API_KEY),
       detail: process.env.LOVABLE_API_KEY ? "מודל AI זמין להפעלה." : "חיבור AI חסר.",
     });
-
-    const twilio = statuses.find((status) => status.key === "twilio_whatsapp");
-    if (twilio?.ready && !twilioFromNumber()) {
-      twilio.ready = false;
-      twilio.detail = "Twilio מחובר, אבל חסר מספר שולח TWILIO_WHATSAPP_FROM.";
-    }
 
     return { ok: true as const, message: "בדיקת סוכנים הושלמה.", statuses };
   });
