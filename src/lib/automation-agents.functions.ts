@@ -140,13 +140,12 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
     const auth = await getAuthorizedUser(data.accessToken, ["super_admin", "operator"]);
     if (!auth.ok) return { ok: false as const, message: auth.message, sent: 0, skipped: 0 };
 
-    const lovableKey = process.env.LOVABLE_API_KEY;
-    const twilioKey = process.env.TWILIO_API_KEY;
-    const from = twilioFromNumber();
-    if (!lovableKey || !twilioKey || !from) {
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!token || !phoneId) {
       return {
         ok: false as const,
-        message: "Twilio WhatsApp עדיין לא מחובר במלואו להפעלה.",
+        message: "Meta WhatsApp Cloud API עדיין לא מחובר במלואו להפעלה.",
         sent: 0,
         skipped: 0,
       };
@@ -174,19 +173,22 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
       }
 
       const body = `שלום ${candidate.name}, חסרים לנו עדיין מסמכים לפתיחת התהליך. נא לשלוח היום צילום תעודת זהות וטופס ירוק ב-WhatsApp. תודה, היילה AI`;
-      const response = await fetch(`${TWILIO_GATEWAY_URL}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableKey}`,
-          "X-Connection-Api-Key": twilioKey,
-          "Content-Type": "application/x-www-form-urlencoded",
+      const response = await fetch(
+        `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: normalizeMetaPhone(candidate.phone),
+            type: "text",
+            text: { body },
+          }),
         },
-        body: new URLSearchParams({
-          To: normalizeWhatsAppPhone(candidate.phone),
-          From: from,
-          Body: body,
-        }),
-      });
+      );
 
       if (response.ok) {
         sent += 1;
