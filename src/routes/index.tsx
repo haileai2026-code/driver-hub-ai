@@ -1247,6 +1247,8 @@ function WhatsAppRemindersWidget({
   stats: ReminderStats | null;
   isLoading: boolean;
 }) {
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
   if (isLoading && !stats) {
     return (
       <Panel title="תזכורות WhatsApp · 14 ימים">
@@ -1262,6 +1264,9 @@ function WhatsAppRemindersWidget({
       </Panel>
     );
   }
+
+  const activeReason =
+    stats.failureReasons.find((r) => r.reason === selectedReason) ?? null;
 
   const successPct = Math.round(stats.successRate * 100);
   const deliveryPct = Math.round(stats.deliveryRate * 100);
