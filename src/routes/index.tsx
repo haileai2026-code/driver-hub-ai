@@ -2102,10 +2102,10 @@ function defaultAgentStatuses(): AutomationAgentStatus[] {
     { key: "sheets", label: "Google Sheets", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
     { key: "drive", label: "Google Drive", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
     {
-      key: "twilio_whatsapp",
-      label: "Twilio WhatsApp",
+      key: "meta_whatsapp",
+      label: "Meta WhatsApp Cloud API",
       ready: false,
-      detail: "יש לחבר Twilio כדי לשלוח WhatsApp.",
+      detail: "מאמת חיבור Meta WhatsApp...",
     },
     {
       key: "haile_ai",
