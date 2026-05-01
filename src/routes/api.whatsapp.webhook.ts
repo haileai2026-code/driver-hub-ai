@@ -248,3 +248,23 @@ function json(payload: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+// Match a Meta E.164 phone (e.g. "972548739473") to a candidate row.
+// Tries exact, with leading "+", and the local "0..." form.
+async function findCandidateIdByPhone(
+  phone: string | undefined | null,
+): Promise<string | null> {
+  if (!phone) return null;
+  const digits = phone.replace(/[^\d]/g, "");
+  const candidates = [digits, `+${digits}`];
+  if (digits.startsWith("972")) candidates.push(`0${digits.slice(3)}`);
+
+  const { data, error } = await supabaseAdmin
+    .from("candidates")
+    .select("id,phone")
+    .in("phone", candidates)
+    .limit(1);
+
+  if (error || !data?.length) return null;
+  return data[0].id;
+}
