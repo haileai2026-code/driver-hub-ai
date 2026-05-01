@@ -57,8 +57,10 @@ import {
   getWhatsAppReminderStats,
   updateCandidate,
   updateCandidateStage,
+  type ReminderFailureReason,
   type ReminderStats,
 } from "@/lib/app-data.functions";
+import { cn } from "@/lib/utils";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
 import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
@@ -1247,6 +1249,8 @@ function WhatsAppRemindersWidget({
   stats: ReminderStats | null;
   isLoading: boolean;
 }) {
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
   if (isLoading && !stats) {
     return (
       <Panel title="תזכורות WhatsApp · 14 ימים">
@@ -1262,6 +1266,9 @@ function WhatsAppRemindersWidget({
       </Panel>
     );
   }
+
+  const activeReason =
+    stats.failureReasons.find((r) => r.reason === selectedReason) ?? null;
 
   const successPct = Math.round(stats.successRate * 100);
   const deliveryPct = Math.round(stats.deliveryRate * 100);
@@ -1398,25 +1405,38 @@ function WhatsAppRemindersWidget({
                 const pct = stats.totalFailed
                   ? Math.round((reason.count / stats.totalFailed) * 100)
                   : 0;
+                const isSelected = reason.reason === selectedReason;
                 return (
-                  <li
-                    key={reason.reason}
-                    className="rounded-md border border-border bg-surface p-2"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="truncate font-medium text-foreground" title={reason.reason}>
-                        {reason.reason}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {reason.count} · {pct}%
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border">
-                      <div
-                        className="h-full bg-warning"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
+                  <li key={reason.reason}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedReason(isSelected ? null : reason.reason)
+                      }
+                      aria-pressed={isSelected}
+                      className={cn(
+                        "w-full rounded-md border bg-surface p-2 text-right transition-colors hover:border-primary/60",
+                        isSelected ? "border-primary" : "border-border",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span
+                          className="truncate font-medium text-foreground"
+                          title={reason.reason}
+                        >
+                          {reason.reason}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {reason.count} · {pct}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border">
+                        <div
+                          className="h-full bg-warning"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </button>
                   </li>
                 );
               })}
@@ -1424,7 +1444,97 @@ function WhatsAppRemindersWidget({
           )}
         </div>
       </div>
+
+      {activeReason && (
+        <ReminderFailureDrilldown
+          reason={activeReason}
+          onClose={() => setSelectedReason(null)}
+        />
+      )}
     </Panel>
+  );
+}
+
+function ReminderFailureDrilldown({
+  reason,
+  onClose,
+}: {
+  reason: ReminderFailureReason;
+  onClose: () => void;
+}) {
+  const tsFmt = new Intl.DateTimeFormat("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const interactionLabel: Record<string, string> = {
+    whatsapp_reminder_failed: "תזכורת",
+    whatsapp_reply_failed: "תשובה",
+    whatsapp_status_failed: "סטטוס מסירה",
+  };
+
+  return (
+    <div className="mt-5 rounded-md border border-border bg-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">פירוט כישלונות עבור</p>
+          <h4 className="truncate text-sm font-bold text-foreground" title={reason.reason}>
+            {reason.reason}
+          </h4>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X className="h-4 w-4" /> סגור
+        </Button>
+      </div>
+      {reason.entries.length === 0 ? (
+        <EmptyState text="אין רשומות זמינות עבור סיבה זו." />
+      ) : (
+        <div className="max-h-80 overflow-auto">
+          <table className="w-full text-right text-xs">
+            <thead className="sticky top-0 bg-surface text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 font-medium">תאריך</th>
+                <th className="px-3 py-2 font-medium">סוג</th>
+                <th className="px-3 py-2 font-medium">מועמד</th>
+                <th className="px-3 py-2 font-medium">טלפון</th>
+                <th className="px-3 py-2 font-medium">פירוט</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reason.entries.map((entry) => (
+                <tr key={entry.id} className="border-b border-border/50 last:border-0">
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                    {tsFmt.format(new Date(entry.createdAt))}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {interactionLabel[entry.interactionType] ?? entry.interactionType}
+                  </td>
+                  <td className="px-3 py-2">
+                    {entry.candidateName ?? (
+                      <span className="text-muted-foreground">לא משויך</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground" dir="ltr">
+                    {entry.candidatePhone ?? "—"}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    <span className="line-clamp-2" title={entry.rawNotes}>
+                      {entry.rawNotes || "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {reason.count > reason.entries.length && (
+            <p className="px-3 py-2 text-[11px] text-muted-foreground">
+              מוצגות {reason.entries.length} מתוך {reason.count} רשומות (אחרונות).
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
