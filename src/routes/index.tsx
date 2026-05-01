@@ -1157,6 +1157,8 @@ function DashboardPage({
   candidates,
   logs,
   isLoading,
+  reminderStats,
+  isLoadingReminderStats,
   onOpenCandidates,
 }: {
   activeCandidates: number;
@@ -1166,6 +1168,8 @@ function DashboardPage({
   candidates: Candidate[];
   logs: LogRow[];
   isLoading: boolean;
+  reminderStats: ReminderStats | null;
+  isLoadingReminderStats: boolean;
   onOpenCandidates: () => void;
 }) {
   const metrics = [
@@ -1228,12 +1232,199 @@ function DashboardPage({
         </Panel>
       </section>
 
-      <Panel title="גרף שבועי">
-        <div className="grid h-56 place-items-center rounded-md border border-dashed border-border bg-surface text-center text-sm text-muted-foreground">
-          הגרף יוצג לאחר שיצטברו לידים ופעולות אמת במערכת.
-        </div>
-      </Panel>
+      <WhatsAppRemindersWidget
+        stats={reminderStats}
+        isLoading={isLoadingReminderStats}
+      />
     </div>
+  );
+}
+
+function WhatsAppRemindersWidget({
+  stats,
+  isLoading,
+}: {
+  stats: ReminderStats | null;
+  isLoading: boolean;
+}) {
+  if (isLoading && !stats) {
+    return (
+      <Panel title="תזכורות WhatsApp · 14 ימים">
+        <EmptyState text="טוען נתוני שליחה..." />
+      </Panel>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <Panel title="תזכורות WhatsApp · 14 ימים">
+        <EmptyState text="אין עדיין נתוני שליחה לתצוגה." />
+      </Panel>
+    );
+  }
+
+  const successPct = Math.round(stats.successRate * 100);
+  const deliveryPct = Math.round(stats.deliveryRate * 100);
+  const maxDay = Math.max(
+    1,
+    ...stats.daily.map((d) => d.sent + d.failed),
+  );
+  const totalAttempts = stats.totalSent + stats.totalFailed;
+
+  const dayFmt = new Intl.DateTimeFormat("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+
+  return (
+    <Panel
+      title="תזכורות WhatsApp · 14 ימים"
+      action={
+        <span className="text-xs text-muted-foreground">
+          מבוסס על {totalAttempts} ניסיונות שליחה
+        </span>
+      }
+    >
+      <div className="grid gap-4 lg:grid-cols-4">
+        <article className="glass-panel rounded-md p-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>אחוז הצלחה</span>
+            <Send className="h-4 w-4 text-primary" />
+          </div>
+          <strong className="block text-2xl font-black">{successPct}%</strong>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {stats.totalSent} נשלחו · {stats.totalFailed} נכשלו
+          </p>
+        </article>
+        <article className="glass-panel rounded-md p-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>אחוז מסירה</span>
+            <CheckCircle2 className="h-4 w-4 text-success" />
+          </div>
+          <strong className="block text-2xl font-black">{deliveryPct}%</strong>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {stats.totalDelivered} נמסרו ל-{stats.totalSent} שנשלחו
+          </p>
+        </article>
+        <article className="glass-panel rounded-md p-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>נקראו</span>
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
+          <strong className="block text-2xl font-black">{stats.totalRead}</strong>
+          <p className="mt-1 text-xs text-muted-foreground">קריאות מאומתות מהנמען</p>
+        </article>
+        <article className="glass-panel rounded-md p-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>כשלים</span>
+            <AlertTriangle className="h-4 w-4 text-warning" />
+          </div>
+          <strong className="block text-2xl font-black">{stats.totalFailed}</strong>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {totalAttempts > 0
+              ? `${Math.round((stats.totalFailed / totalAttempts) * 100)}% מהניסיונות`
+              : "אין נתונים"}
+          </p>
+        </article>
+      </div>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <div>
+          <h3 className="mb-2 text-sm font-bold text-muted-foreground">
+            מגמת שליחה (נשלח / נכשל)
+          </h3>
+          <div className="rounded-md border border-border bg-surface p-3">
+            <div
+              className="flex h-40 items-end gap-1"
+              dir="ltr"
+              role="img"
+              aria-label="גרף עמודות יומי של תזכורות WhatsApp"
+            >
+              {stats.daily.map((day) => {
+                const total = day.sent + day.failed;
+                const sentPct = (day.sent / maxDay) * 100;
+                const failPct = (day.failed / maxDay) * 100;
+                return (
+                  <div
+                    key={day.date}
+                    className="group relative flex flex-1 flex-col justify-end"
+                    title={`${day.date}: ${day.sent} נשלחו, ${day.failed} נכשלו, ${day.delivered} נמסרו`}
+                  >
+                    <div
+                      className="w-full bg-warning/70"
+                      style={{ height: `${failPct}%` }}
+                    />
+                    <div
+                      className="w-full bg-primary/80"
+                      style={{ height: `${sentPct}%` }}
+                    />
+                    {total === 0 && (
+                      <div className="h-px w-full bg-border" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex justify-between text-[10px] text-muted-foreground" dir="ltr">
+              <span>{dayFmt.format(new Date(stats.daily[0]?.date ?? Date.now()))}</span>
+              <span>
+                {dayFmt.format(
+                  new Date(stats.daily[stats.daily.length - 1]?.date ?? Date.now()),
+                )}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-3 bg-primary/80" /> נשלח
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-3 bg-warning/70" /> נכשל
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-sm font-bold text-muted-foreground">
+            סיבות כישלון מובילות
+          </h3>
+          {stats.failureReasons.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border bg-surface p-4 text-center text-xs text-muted-foreground">
+              אין כשלים בתקופה זו 🎉
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {stats.failureReasons.map((reason) => {
+                const pct = stats.totalFailed
+                  ? Math.round((reason.count / stats.totalFailed) * 100)
+                  : 0;
+                return (
+                  <li
+                    key={reason.reason}
+                    className="rounded-md border border-border bg-surface p-2"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate font-medium text-foreground" title={reason.reason}>
+                        {reason.reason}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {reason.count} · {pct}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full bg-warning"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Panel>
   );
 }
 
