@@ -65,6 +65,7 @@ import {
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
 import { getAppSettings, saveAppSettings } from "@/lib/app-settings.functions";
+import { chatWithAgent } from "@/lib/agent-chat.functions";
 import { CITY_OPTIONS, CITY_LABELS_HE, cityLabel, type CityOption, normalizeCityValue } from "@/lib/cities";
 
 export const Route = createFileRoute("/")({
