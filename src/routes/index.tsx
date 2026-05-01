@@ -948,7 +948,11 @@ function HaileApp() {
             {activePage === "ciel" && <CielPage candidates={candidates} logs={logs} />}
             {activePage === "voice" && <VoicePage />}
             {activePage === "settings" && (
-              <SettingsPage onExport={exportCandidates} isSuperAdmin={isSuperAdmin} />
+              <SettingsPage
+                onExport={exportCandidates}
+                isSuperAdmin={isSuperAdmin}
+                agentStatuses={agentStatuses}
+              />
             )}
             {activePage === "admin" && isSuperAdmin && (
               <AdminUsersPage users={systemUsers} onInvite={handleInvite} status={actionStatus} />
@@ -2102,10 +2106,10 @@ function defaultAgentStatuses(): AutomationAgentStatus[] {
     { key: "sheets", label: "Google Sheets", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
     { key: "drive", label: "Google Drive", ready: false, detail: "לחץ בדיקה כדי לוודא חיבור." },
     {
-      key: "twilio_whatsapp",
-      label: "Twilio WhatsApp",
+      key: "meta_whatsapp",
+      label: "Meta WhatsApp Cloud API",
       ready: false,
-      detail: "יש לחבר Twilio כדי לשלוח WhatsApp.",
+      detail: "מאמת חיבור Meta WhatsApp...",
     },
     {
       key: "haile_ai",
@@ -2434,12 +2438,80 @@ function ReportsPage() {
   );
 }
 
+function ConnectionStatusList({ statuses }: { statuses: AutomationAgentStatus[] }) {
+  const [liveStatuses, setLiveStatuses] = useState<AutomationAgentStatus[]>(statuses);
+  const [loading, setLoading] = useState(statuses.length === 0);
+
+  useEffect(() => {
+    if (statuses.length > 0) {
+      setLiveStatuses(statuses);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+      const result = await checkAutomationAgents({ data: { accessToken } });
+      if (cancelled) return;
+      if (result.ok && result.statuses.length > 0) {
+        setLiveStatuses(result.statuses);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [statuses]);
+
+  const list = liveStatuses.length ? liveStatuses : defaultAgentStatuses();
+
+  return (
+    <div className="flex flex-col gap-2">
+      {loading && (
+        <p className="text-xs text-muted-foreground">בודק חיבורים...</p>
+      )}
+      {list.map((status) => (
+        <div
+          key={status.key}
+          className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2"
+        >
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-foreground">{status.label}</span>
+            <span className="text-xs text-muted-foreground">{status.detail}</span>
+          </div>
+          <span
+            className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+              status.ready
+                ? "bg-emerald-500/15 text-emerald-500"
+                : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                status.ready ? "bg-emerald-500" : "bg-destructive"
+              }`}
+            />
+            {status.ready ? "מחובר" : "לא מחובר"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SettingsPage({
   onExport,
   isSuperAdmin,
+  agentStatuses,
 }: {
   onExport: () => void;
   isSuperAdmin: boolean;
+  agentStatuses: AutomationAgentStatus[];
 }) {
   const [benyWhatsapp, setBenyWhatsapp] = useState("");
   const [summaryTime, setSummaryTime] = useState("08:00");
@@ -2577,15 +2649,7 @@ function SettingsPage({
       </Panel>
 
       <Panel title="חיבורים">
-        <SettingsGrid
-          items={[
-            "WhatsApp Business API (Meta Cloud)",
-            "Google Calendar OAuth",
-            "Gmail OAuth",
-            "Google Docs OAuth: מחובר",
-            "Google Sheets OAuth: מחובר",
-          ]}
-        />
+        <ConnectionStatusList statuses={agentStatuses} />
       </Panel>
 
       <Panel title="גיבוי נתונים">
