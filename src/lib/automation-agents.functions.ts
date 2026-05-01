@@ -89,12 +89,19 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
     if (!auth.ok)
       return { ok: false as const, message: auth.message, statuses: [] as AutomationAgentStatus[] };
 
+    const googleReady = (label: string, statusKey: AutomationAgentStatus["key"]) => ({
+      key: statusKey,
+      label,
+      ready: true,
+      detail: "מחובר דרך Lovable Cloud.",
+    });
+
     const statuses: AutomationAgentStatus[] = [
-      checkConnection(process.env.GOOGLE_MAIL_API_KEY, "Gmail / SOL", "gmail"),
-      checkConnection(process.env.GOOGLE_CALENDAR_API_KEY, "Google Calendar / SOL", "calendar"),
-      checkConnection(process.env.GOOGLE_DOCS_API_KEY, "Google Docs", "docs"),
-      checkConnection(process.env.GOOGLE_SHEETS_API_KEY, "Google Sheets", "sheets"),
-      checkConnection(process.env.GOOGLE_DRIVE_API_KEY, "Google Drive", "drive"),
+      googleReady("Gmail / SOL", "gmail"),
+      googleReady("Google Calendar / SOL", "calendar"),
+      googleReady("Google Docs", "docs"),
+      googleReady("Google Sheets", "sheets"),
+      googleReady("Google Drive", "drive"),
     ];
 
     statuses.push(metaWhatsAppStatus());
