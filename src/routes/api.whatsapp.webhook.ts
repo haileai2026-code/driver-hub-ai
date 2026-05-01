@@ -54,23 +54,74 @@ export const Route = createFileRoute("/api/whatsapp/webhook")({
       POST: async ({ request }: { request: Request }) => {
         try {
           const body = (await request.json()) as WaWebhookBody;
+          const value = body.entry?.[0]?.changes?.[0]?.value;
 
-          const message =
-            body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+          // Handle delivery status callbacks (sent / delivered / read / failed)
+          const statuses = value?.statuses;
+          if (statuses?.length) {
+            for (const s of statuses) {
+              const ts = s.timestamp
+                ? new Date(Number(s.timestamp) * 1000).toISOString()
+                : new Date().toISOString();
+              const candidateId = await findCandidateIdByPhone(s.recipient_id);
+              const errMsg = s.errors?.[0]?.message ?? s.errors?.[0]?.title;
+              await supabaseAdmin.from("operation_logs").insert({
+                candidate_id: candidateId,
+                operator_name: "WhatsApp Webhook",
+                interaction_type: `whatsapp_status_${s.status}`,
+                notes_hebrew: `[${s.status} ${ts}] msg id: ${s.id}${errMsg ? ` | שגיאה: ${errMsg}` : ""}`,
+                source_message: s.id,
+                follow_up_required: s.status === "failed",
+              });
+            }
+            return json({ ok: true });
+          }
 
-          // Ignore status updates and non-text events
+          const message = value?.messages?.[0];
+
+          // Ignore non-text events
           if (!message || message.type !== "text" || !message.text) {
             return json({ ok: true });
           }
+
+          const receivedAt = message.timestamp
+            ? new Date(Number(message.timestamp) * 1000).toISOString()
+            : new Date().toISOString();
+          const text = message.text.body.trim();
+          const fromCandidateId = await findCandidateIdByPhone(message.from);
+
+          // Log every inbound driver message
+          await supabaseAdmin.from("operation_logs").insert({
+            candidate_id: fromCandidateId,
+            operator_name: "WhatsApp Inbound",
+            interaction_type: "whatsapp_inbound_received",
+            notes_hebrew: `[התקבל ${receivedAt}] מ-${message.from}: ${text}`,
+            source_message: text,
+            follow_up_required: false,
+          });
 
           if (message.from !== BENY_PHONE) {
             return json({ ok: true, skipped: "unauthorized sender" });
           }
 
-          const text = message.text.body.trim();
           const reply = await handleCommand(text);
+          const sendResult = await sendWhatsAppText(BENY_PHONE, reply);
+          const sentAt = new Date().toISOString();
 
-          await sendWhatsAppText(BENY_PHONE, reply);
+          await supabaseAdmin.from("operation_logs").insert({
+            candidate_id: fromCandidateId,
+            operator_name: "WhatsApp Webhook",
+            interaction_type: sendResult.ok
+              ? "whatsapp_reply_sent"
+              : "whatsapp_reply_failed",
+            notes_hebrew: sendResult.ok
+              ? `[נשלח ${sentAt}] ${reply}${sendResult.messageId ? ` (msg id: ${sendResult.messageId})` : ""}`
+              : `[נכשל ${sentAt}] ${sendResult.error} | ${reply}`,
+            translated_hebrew: reply,
+            source_message: reply,
+            follow_up_required: !sendResult.ok,
+          });
+
           return json({ ok: true });
         } catch (err) {
           console.error("[whatsapp webhook] error processing message", err);
