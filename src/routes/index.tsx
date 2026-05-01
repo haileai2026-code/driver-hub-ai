@@ -3283,6 +3283,10 @@ function SettingsPage({
         <IntegrationTester isSuperAdmin={isSuperAdmin} />
       </Panel>
 
+      <Panel title="WhatsApp — תבניות סטטוס ושפה">
+        <WhatsAppSenderSettings isSuperAdmin={isSuperAdmin} defaultPhone={benyWhatsapp} />
+      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
@@ -3395,6 +3399,243 @@ function IntegrationTester({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       </div>
       <p className="text-xs text-muted-foreground">
         כל בדיקה (הצלחה או כישלון) נרשמת אוטומטית ב-Operations log.
+      </p>
+    </div>
+  );
+}
+
+type WhatsLang = "he" | "am" | "ru";
+type WhatsTemplateKey =
+  | "status_update"
+  | "documents_reminder"
+  | "test_scheduled"
+  | "training_invite"
+  | "placement_congrats";
+
+const WHATSAPP_LANGUAGES: { value: WhatsLang; label: string }[] = [
+  { value: "he", label: "עברית" },
+  { value: "am", label: "Amharic" },
+  { value: "ru", label: "Русский" },
+];
+
+const WHATSAPP_TEMPLATES: Record<
+  WhatsTemplateKey,
+  { label: string; bodies: Record<WhatsLang, string> }
+> = {
+  status_update: {
+    label: "עדכון סטטוס כללי",
+    bodies: {
+      he: "שלום {{name}}, עדכון מצוות Haile AI: השלב הנוכחי שלך הוא {{stage}}. נשמח לעדכון ממך 🙏",
+      am: "ሰላም {{name}}፣ ከHaile AI ቡድን ዝመና፦ የአሁኑ ደረጃዎ {{stage}} ነው። ምላሽ ለመስጠት እባክዎ ያሳውቁን 🙏",
+      ru: "Здравствуйте, {{name}}! Обновление от команды Haile AI: ваш текущий этап — {{stage}}. Пожалуйста, сообщите нам новости 🙏",
+    },
+  },
+  documents_reminder: {
+    label: "תזכורת מסמכים",
+    bodies: {
+      he: "היי {{name}}, חסרים לנו עדיין מסמכים להמשך התהליך. אפשר לשלוח אותם בוואטסאפ כתשובה להודעה זו. תודה!",
+      am: "ሰላም {{name}}፣ ሂደቱን ለመቀጠል አሁንም አንዳንድ ሰነዶች ይጎድላሉ። እባክዎ በዚህ መልዕክት መልስ ይላኩልን። እናመሰግናለን!",
+      ru: "Здравствуйте, {{name}}! Нам всё ещё не хватает документов, чтобы продолжить процесс. Пожалуйста, отправьте их ответом на это сообщение. Спасибо!",
+    },
+  },
+  test_scheduled: {
+    label: "זימון למבחן",
+    bodies: {
+      he: "{{name}}, נקבע לך מועד מבחן. אנא אשר/י קבלה ונדאג להכנה אחרונה. בהצלחה!",
+      am: "{{name}}፣ የፈተና ቀን ተዘጋጅቶልዎታል። እባክዎ ማረጋገጫ ይላኩ፣ የመጨረሻ ዝግጅት እናደርጋለን። መልካም ዕድል!",
+      ru: "{{name}}, для вас назначена дата экзамена. Пожалуйста, подтвердите получение — мы поможем с финальной подготовкой. Удачи!",
+    },
+  },
+  training_invite: {
+    label: "הזמנה להדרכה",
+    bodies: {
+      he: "שלום {{name}}, מזמינים אותך להדרכת נהגים. אנא אשר/י השתתפות ונשלח פרטים מדויקים.",
+      am: "ሰላም {{name}}፣ ለሹፌሮች ስልጠና እንጋብዝዎታለን። እባክዎ መሳተፍዎን ያረጋግጡ፣ ዝርዝሩን እንልክልዎታለን።",
+      ru: "Здравствуйте, {{name}}! Приглашаем вас на тренинг для водителей. Пожалуйста, подтвердите участие — мы пришлём подробности.",
+    },
+  },
+  placement_congrats: {
+    label: "ברכה על השמה",
+    bodies: {
+      he: "{{name}}, ברכות על ההשמה! צוות Haile AI גאה בך. נשארים בקשר להמשך הליווי 🚍",
+      am: "{{name}}፣ በመመደብዎ እንኳን ደስ አለዎት! የHaile AI ቡድን በእርስዎ ይኮራል። ለቀጣይ ድጋፍ እንገናኝ 🚍",
+      ru: "{{name}}, поздравляем с трудоустройством! Команда Haile AI гордится вами. Остаёмся на связи для дальнейшего сопровождения 🚍",
+    },
+  },
+};
+
+function renderWhatsTemplate(
+  body: string,
+  vars: { name: string; stage: string },
+) {
+  return body
+    .replaceAll("{{name}}", vars.name.trim() || "—")
+    .replaceAll("{{stage}}", vars.stage.trim() || "—");
+}
+
+function WhatsAppSenderSettings({
+  isSuperAdmin,
+  defaultPhone,
+}: {
+  isSuperAdmin: boolean;
+  defaultPhone: string;
+}) {
+  const [templateKey, setTemplateKey] = useState<WhatsTemplateKey>("status_update");
+  const [language, setLanguage] = useState<WhatsLang>("he");
+  const [recipientName, setRecipientName] = useState("");
+  const [stageLabel, setStageLabel] = useState("Lead");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const sendTest = useServerFn(sendTestNotification);
+
+  useEffect(() => {
+    if (defaultPhone && !phone) setPhone(defaultPhone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultPhone]);
+
+  if (!isSuperAdmin) {
+    return <SettingsGrid items={["רק SUPER_ADMIN יכול להגדיר ולשלוח הודעות WhatsApp."]} />;
+  }
+
+  const template = WHATSAPP_TEMPLATES[templateKey];
+  const preview = renderWhatsTemplate(template.bodies[language], {
+    name: recipientName,
+    stage: stageLabel,
+  });
+  const isRtlPreview = language === "he" || language === "am";
+
+  const handleSend = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setResult({ ok: false, message: "יש להתחבר מחדש." });
+        return;
+      }
+      const res = await sendTest({
+        data: {
+          accessToken,
+          channel: "whatsapp",
+          target: phone.trim(),
+          message: preview,
+        },
+      });
+      setResult({ ok: res.ok, message: res.message });
+    } catch (err) {
+      setResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "שגיאה לא ידועה.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">תבנית הודעה</span>
+        <select
+          value={templateKey}
+          onChange={(e) => setTemplateKey(e.target.value as WhatsTemplateKey)}
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        >
+          {(Object.keys(WHATSAPP_TEMPLATES) as WhatsTemplateKey[]).map((k) => (
+            <option key={k} value={k}>
+              {WHATSAPP_TEMPLATES[k].label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground">שפה</span>
+        <div className="flex flex-wrap gap-2">
+          {WHATSAPP_LANGUAGES.map((l) => (
+            <button
+              key={l.value}
+              type="button"
+              onClick={() => setLanguage(l.value)}
+              className={cn(
+                "rounded-md border px-3 py-1.5 text-xs font-bold transition",
+                language === l.value
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-surface text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-muted-foreground">שם המועמד</span>
+          <input
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+            placeholder="לדוגמה: דניאל"
+            className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-muted-foreground">שלב נוכחי</span>
+          <input
+            value={stageLabel}
+            onChange={(e) => setStageLabel(e.target.value)}
+            placeholder="Lead / Learning / Test / Placed"
+            className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+          />
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">טלפון יעד (כולל קידומת)</span>
+        <input
+          dir="ltr"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+972501234567"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+        />
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground">תצוגה מקדימה</span>
+        <div
+          dir={isRtlPreview ? "rtl" : "ltr"}
+          className="min-h-[80px] whitespace-pre-wrap rounded-md border border-dashed border-border bg-surface p-3 text-foreground"
+        >
+          {preview}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button
+          variant="tactical"
+          onClick={handleSend}
+          disabled={busy || !phone.trim() || !preview.trim()}
+        >
+          <Send className="h-4 w-4" />
+          {busy ? "שולח..." : "שלח WhatsApp"}
+        </Button>
+        {result && (
+          <span
+            className={cn(
+              "text-xs",
+              result.ok ? "text-emerald-500" : "text-destructive",
+            )}
+          >
+            {result.message}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        ההודעה נשלחת דרך Meta WhatsApp Cloud API ונרשמת ב-Operations log.
       </p>
     </div>
   );
