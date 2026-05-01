@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendWhatsAppText } from "@/lib/whatsapp.server";
 
-const VERIFY_TOKEN = "haile_verify_2026";
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 // WhatsApp sends the sender phone in E.164 without "+": 0548739473 → 972548739473
 const BENY_PHONE = "972548739473";
 
@@ -33,6 +33,10 @@ export const Route = createFileRoute("/api/whatsapp/webhook")({
         const token = url.searchParams.get("hub.verify_token");
         const challenge = url.searchParams.get("hub.challenge");
 
+        if (!VERIFY_TOKEN) {
+          console.error("WHATSAPP_VERIFY_TOKEN not configured");
+          return new Response("Forbidden", { status: 403 });
+        }
         if (mode === "subscribe" && token === VERIFY_TOKEN) {
           return new Response(challenge ?? "", { status: 200 });
         }
@@ -61,8 +65,8 @@ export const Route = createFileRoute("/api/whatsapp/webhook")({
           await sendWhatsAppText(BENY_PHONE, reply);
           return json({ ok: true });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Unknown error";
-          return json({ ok: false, error: msg }, 500);
+          console.error("[whatsapp webhook] error processing message", err);
+          return json({ ok: false, error: "Internal error" }, 500);
         }
       },
     },
