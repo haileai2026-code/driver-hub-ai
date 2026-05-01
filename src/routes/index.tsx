@@ -69,6 +69,7 @@ import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.funct
 import {
   checkAutomationAgents,
   sendMissingDocsWhatsAppReminders,
+  sendTestNotification,
   type AutomationAgentStatus,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
