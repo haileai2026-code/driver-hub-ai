@@ -68,9 +68,11 @@ import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
 import {
   checkAutomationAgents,
+  getRecentIntegrationFailures,
   sendMissingDocsWhatsAppReminders,
   sendTestNotification,
   type AutomationAgentStatus,
+  type IntegrationFailure,
 } from "@/lib/automation-agents.functions";
 import { recordAgentAction, saveCandidateRating } from "@/lib/agents-actions.functions";
 import { getAppSettings, saveAppSettings } from "@/lib/app-settings.functions";
@@ -3287,6 +3289,10 @@ function SettingsPage({
         <WhatsAppSenderSettings isSuperAdmin={isSuperAdmin} defaultPhone={benyWhatsapp} />
       </Panel>
 
+      <Panel title="שגיאות ערוצים אחרונות">
+        <IntegrationFailuresPanel isAuthorized={isSuperAdmin} />
+      </Panel>
+
       <Panel title="גיבוי נתונים">
         <Button variant="tactical" onClick={onExport}>
           <Download className="h-4 w-4" /> ייצוא CSV של מועמדים
@@ -3636,6 +3642,186 @@ function WhatsAppSenderSettings({
       </div>
       <p className="text-xs text-muted-foreground">
         ההודעה נשלחת דרך Meta WhatsApp Cloud API ונרשמת ב-Operations log.
+      </p>
+    </div>
+  );
+}
+
+const FAILURE_CHANNEL_LABELS: Record<IntegrationFailure["channel"], string> = {
+  slack: "Slack",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
+  other: "אחר",
+};
+
+function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
+  const [failures, setFailures] = useState<IntegrationFailure[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<"all" | IntegrationFailure["channel"]>("all");
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  const fetchFailures = useServerFn(getRecentIntegrationFailures);
+  const sendTest = useServerFn(sendTestNotification);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) return;
+      const res = await fetchFailures({ data: { accessToken } });
+      if (res.ok) setFailures(res.failures);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthorized) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthorized]);
+
+  if (!isAuthorized) {
+    return <SettingsGrid items={["רק מורשים יכולים לראות שגיאות ערוצים."]} />;
+  }
+
+  const filtered = filter === "all" ? failures : failures.filter((f) => f.channel === filter);
+
+  const counts = failures.reduce<Record<string, number>>((acc, f) => {
+    acc[f.channel] = (acc[f.channel] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const handleRetry = async (f: IntegrationFailure) => {
+    if (f.channel === "other" || !f.target || !f.message) {
+      setStatusMsg({ ok: false, message: "אין מספיק מידע כדי לנסות שליחה חוזרת." });
+      return;
+    }
+    setRetryingId(f.id);
+    setStatusMsg(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setStatusMsg({ ok: false, message: "יש להתחבר מחדש." });
+        return;
+      }
+      const res = await sendTest({
+        data: {
+          accessToken,
+          channel: f.channel as "slack" | "telegram" | "whatsapp",
+          target: f.target,
+          message: f.message,
+        },
+      });
+      setStatusMsg({ ok: res.ok, message: res.message });
+      await load();
+    } catch (err) {
+      setStatusMsg({
+        ok: false,
+        message: err instanceof Error ? err.message : "שגיאה בשליחה חוזרת.",
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const channels: ("all" | IntegrationFailure["channel"])[] = [
+    "all",
+    "slack",
+    "telegram",
+    "whatsapp",
+    "other",
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        {channels.map((c) => {
+          const label =
+            c === "all" ? `הכל (${failures.length})` : `${FAILURE_CHANNEL_LABELS[c]} (${counts[c] ?? 0})`;
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setFilter(c)}
+              className={cn(
+                "rounded-md border px-3 py-1.5 text-xs font-bold transition",
+                filter === c
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-surface text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+        <Button variant="tactical" onClick={load} disabled={loading} className="ml-auto">
+          {loading ? "טוען..." : "רענן"}
+        </Button>
+      </div>
+
+      {statusMsg && (
+        <div
+          className={cn(
+            "rounded-md border px-3 py-2 text-xs",
+            statusMsg.ok
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+              : "border-destructive/30 bg-destructive/10 text-destructive",
+          )}
+        >
+          {statusMsg.message}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <EmptyState text={loading ? "טוען שגיאות..." : "אין שגיאות אחרונות בערוצי התקשורת. ✅"} />
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filtered.map((f) => {
+            const canRetry =
+              f.channel !== "other" && Boolean(f.target) && Boolean(f.message);
+            return (
+              <li
+                key={f.id}
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-xs font-bold text-destructive">
+                      {FAILURE_CHANNEL_LABELS[f.channel]}
+                    </span>
+                    {f.target && (
+                      <span dir="ltr" className="text-xs text-muted-foreground">
+                        {f.target}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(f.createdAt).toLocaleString("he-IL")}
+                    </span>
+                  </div>
+                  <Button
+                    variant="tactical"
+                    onClick={() => handleRetry(f)}
+                    disabled={!canRetry || retryingId === f.id}
+                  >
+                    <Send className="h-4 w-4" />
+                    {retryingId === f.id ? "שולח..." : "נסה שוב"}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-destructive">{f.error}</p>
+                {f.message && (
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    הודעה: {f.message}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="text-xs text-muted-foreground">
+        מציג עד 30 שגיאות אחרונות מ-Operations log. שליחה חוזרת מבצעת קריאה אמיתית לערוץ.
       </p>
     </div>
   );
