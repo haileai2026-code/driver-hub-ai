@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSavedBenyTelegramChatId } from "@/lib/app-settings.server";
 
 const AccessTokenSchema = z.object({
   accessToken: z.string().min(20).max(5000),
