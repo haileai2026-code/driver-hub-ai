@@ -161,7 +161,7 @@ export const checkAutomationAgents = createServerFn({ method: "POST" })
 
 const TestNotificationSchema = AccessTokenSchema.extend({
   channel: z.enum(["slack", "telegram", "whatsapp"]),
-  target: z.string().trim().min(1).max(200),
+  target: z.string().trim().max(200).default(""),
   message: z.string().trim().min(1).max(2000),
 });
 
