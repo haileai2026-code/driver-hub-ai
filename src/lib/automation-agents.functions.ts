@@ -292,15 +292,16 @@ export const sendTestNotification = createServerFn({ method: "POST" })
         message: `הודעה נשלחה ב-WhatsApp (msg id: ${json.messages?.[0]?.id ?? ""}).`,
       };
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "שגיאה לא ידועה.";
+      const rawMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[automation-agents] sendTestNotification failed:", rawMsg);
       await logIntegrationEvent({
         channel: data.channel,
         target: data.target,
         message: data.message,
         status: "failed",
-        error: errMsg,
+        error: rawMsg,
       });
-      return { ok: false as const, message: errMsg };
+      return { ok: false as const, message: "שליחת ההודעה נכשלה. בדקו את הגדרות הערוץ ונסו שוב." };
     }
   });
 
