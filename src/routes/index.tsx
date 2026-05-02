@@ -3949,10 +3949,43 @@ const FAILURE_CHANNEL_LABELS: Record<IntegrationFailure["channel"], string> = {
   other: "אחר",
 };
 
+type FailureErrorType =
+  | "all"
+  | "auth"
+  | "not_registered"
+  | "chat_not_found"
+  | "blocked"
+  | "rate_limit"
+  | "network"
+  | "other";
+
+const FAILURE_ERROR_TYPE_LABELS: Record<FailureErrorType, string> = {
+  all: "כל סוגי השגיאות",
+  auth: "טוקן/הרשאה",
+  not_registered: "נמען לא רשום",
+  chat_not_found: "Chat לא נמצא",
+  blocked: "חסום ע״י משתמש",
+  rate_limit: "הגבלת קצב",
+  network: "תקשורת/שרת",
+  other: "אחר",
+};
+
+function classifyFailureError(error: string): Exclude<FailureErrorType, "all"> {
+  const e = error.toLowerCase();
+  if (/token|טוקן|auth|unauthor|הרשא|expired|פג תוקף/.test(e)) return "auth";
+  if (/not registered|לא רשום|133010|allowed list|לא אושר/.test(e)) return "not_registered";
+  if (/chat not found|chat id לא נמצא/.test(e)) return "chat_not_found";
+  if (/blocked|חסם|חסום/.test(e)) return "blocked";
+  if (/rate|too many|429|עומס/.test(e)) return "rate_limit";
+  if (/network|fetch|timeout|5\d\d|שרת|תקשורת/.test(e)) return "network";
+  return "other";
+}
+
 function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
   const [failures, setFailures] = useState<IntegrationFailure[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | IntegrationFailure["channel"]>("all");
+  const [errorTypeFilter, setErrorTypeFilter] = useState<FailureErrorType>("all");
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const fetchFailures = useServerFn(getRecentIntegrationFailures);
@@ -3980,10 +4013,20 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
     return <SettingsGrid items={["רק מורשים יכולים לראות שגיאות ערוצים."]} />;
   }
 
-  const filtered = filter === "all" ? failures : failures.filter((f) => f.channel === filter);
+  const failuresWithType = failures.map((f) => ({ ...f, errorType: classifyFailureError(f.error) }));
+  const filtered = failuresWithType.filter(
+    (f) =>
+      (filter === "all" || f.channel === filter) &&
+      (errorTypeFilter === "all" || f.errorType === errorTypeFilter),
+  );
 
   const counts = failures.reduce<Record<string, number>>((acc, f) => {
     acc[f.channel] = (acc[f.channel] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const errorTypeCounts = failuresWithType.reduce<Record<string, number>>((acc, f) => {
+    acc[f.errorType] = (acc[f.errorType] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -4054,6 +4097,31 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
         <Button variant="tactical" onClick={load} disabled={loading} className="ml-auto">
           {loading ? "טוען..." : "רענן"}
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-xs font-bold text-muted-foreground">סוג שגיאה:</label>
+        <select
+          value={errorTypeFilter}
+          onChange={(e) => setErrorTypeFilter(e.target.value as FailureErrorType)}
+          className="rounded-md border border-border bg-surface px-2 py-1 text-xs font-bold"
+        >
+          {(Object.keys(FAILURE_ERROR_TYPE_LABELS) as FailureErrorType[]).map((t) => (
+            <option key={t} value={t}>
+              {FAILURE_ERROR_TYPE_LABELS[t]}
+              {t !== "all" && errorTypeCounts[t] ? ` (${errorTypeCounts[t]})` : ""}
+            </option>
+          ))}
+        </select>
+        {errorTypeFilter !== "all" && (
+          <button
+            type="button"
+            onClick={() => setErrorTypeFilter("all")}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            נקה
+          </button>
+        )}
       </div>
 
       {statusMsg && (
