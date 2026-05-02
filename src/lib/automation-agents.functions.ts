@@ -253,9 +253,13 @@ export const sendTestNotification = createServerFn({ method: "POST" })
       if (data.channel === "telegram") {
         const tgKey = process.env.TELEGRAM_API_KEY;
         if (!lovableKey || !tgKey) throw new Error("Telegram לא מחובר.");
-        const chatId = data.target.trim() || (await getSavedBenyTelegramChatId());
+        const chatId = (data.target.trim() || (await getSavedBenyTelegramChatId())).trim();
         if (!chatId)
           throw new Error("לא הוגדר Telegram Chat ID. הזן יעד או שמור Chat ID בהגדרות פרופיל מנכ״ל.");
+        if (!isValidTelegramChatId(chatId))
+          throw new Error(
+            `Telegram Chat ID לא תקין: "${chatId}". נדרש מזהה מספרי (למשל 123456789), לא username או מספר טלפון. שלח /start לבוט וקח את chat.id.`,
+          );
         const res = await fetch(
           "https://connector-gateway.lovable.dev/telegram/sendMessage",
           {
@@ -265,7 +269,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
               "X-Connection-Api-Key": tgKey,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ chat_id: chatId, text: data.message }),
+            body: JSON.stringify({ chat_id: Number(chatId), text: data.message }),
           },
         );
         const json = (await res.json().catch(() => ({}))) as {
@@ -273,7 +277,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
           description?: string;
         };
         if (!res.ok || json.ok === false)
-          throw new Error(json.description ?? `Telegram שגיאה ${res.status}`);
+          throw new Error(friendlyTelegramError(json.description ?? `Telegram שגיאה ${res.status}`));
         await logIntegrationEvent({
           channel: "telegram",
           target: chatId,
@@ -287,6 +291,11 @@ export const sendTestNotification = createServerFn({ method: "POST" })
       const token = process.env.WHATSAPP_ACCESS_TOKEN;
       const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
       if (!token || !phoneId) throw new Error("WhatsApp לא מחובר.");
+      const normalizedTo = normalizeMetaPhone(data.target);
+      if (!isValidE164Phone(normalizedTo))
+        throw new Error(
+          `מספר WhatsApp לא תקין: "${data.target}". נדרש פורמט E.164 (למשל 972541234567).`,
+        );
       const res = await fetch(
         `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
         {
@@ -297,7 +306,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             messaging_product: "whatsapp",
-            to: normalizeMetaPhone(data.target),
+            to: normalizedTo,
             type: "text",
             text: { body: data.message },
           }),
@@ -308,10 +317,10 @@ export const sendTestNotification = createServerFn({ method: "POST" })
         messages?: Array<{ id: string }>;
       };
       if (!res.ok)
-        throw new Error(json.error?.message ?? `WhatsApp שגיאה ${res.status}`);
+        throw new Error(friendlyWhatsAppError(json.error?.message ?? `WhatsApp שגיאה ${res.status}`));
       await logIntegrationEvent({
         channel: "whatsapp",
-        target: data.target,
+        target: normalizedTo,
         message: data.message,
         status: "sent",
       });
