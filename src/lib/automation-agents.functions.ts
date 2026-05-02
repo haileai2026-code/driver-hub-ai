@@ -51,9 +51,37 @@ async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
 
 function normalizeMetaPhone(phone: string | null) {
   if (!phone) return "";
-  const digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
-  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
+  let digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
+  if (digits.startsWith("9720")) digits = `972${digits.slice(4)}`;
   return digits;
+}
+
+function isValidE164Phone(digits: string): boolean {
+  return /^[1-9]\d{7,14}$/.test(digits);
+}
+
+function isValidTelegramChatId(value: string): boolean {
+  // Telegram chat_id must be a numeric ID (positive for users, negative for groups/channels).
+  // Usernames like "@bot" or phone numbers are NOT valid for sendMessage.
+  return /^-?\d{4,}$/.test(value.trim());
+}
+
+function friendlyWhatsAppError(raw: string): string {
+  if (/133010/.test(raw)) return "המספר אינו רשום ב-WhatsApp או לא אושר כנמען בסביבת הבדיקה של Meta.";
+  if (/Authentication|OAuthException|expired|invalid token/i.test(raw))
+    return "WHATSAPP_ACCESS_TOKEN פג תוקף או לא תקין. צור טוקן חדש ב-Meta Business.";
+  if (/recipient phone number not in allowed list/i.test(raw))
+    return "המספר לא אושר כנמען. הוסף אותו ב-WhatsApp Manager → API Setup → To.";
+  return raw;
+}
+
+function friendlyTelegramError(raw: string): string {
+  if (/chat not found/i.test(raw))
+    return "Chat ID לא נמצא. השתמש ב-chat_id מספרי (לא username/טלפון). שלח /start לבוט וקח את chat.id מ-getUpdates.";
+  if (/bot was blocked/i.test(raw)) return "המשתמש חסם את הבוט בטלגרם.";
+  if (/unauthorized/i.test(raw)) return "TELEGRAM_API_KEY לא תקין.";
+  return raw;
 }
 
 async function verifyConnector(connectorApiKey: string | undefined): Promise<{
