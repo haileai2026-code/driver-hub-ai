@@ -41,8 +41,10 @@ async function callGmail<T>(path: string, init?: { method?: string; body?: unkno
   const lovableKey = process.env.LOVABLE_API_KEY;
   const gmailKey = process.env.GOOGLE_MAIL_API_KEY;
 
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!gmailKey) throw new Error("GOOGLE_MAIL_API_KEY is not configured");
+  if (!lovableKey || !gmailKey) {
+    console.error("[google-agent] Missing Gmail gateway configuration");
+    throw new Error("Gmail service unavailable");
+  }
 
   const response = await fetch(`${GMAIL_GATEWAY_URL}${path}`, {
     method: init?.method ?? "GET",
@@ -148,10 +150,8 @@ export const generateGmailWhatsAppReminder = createServerFn({ method: "POST" })
         email: { from, subject, snippet },
       };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "חיבור Gmail נכשל.",
-      };
+      console.error("[google-agent] generateGmailWhatsAppReminder failed:", error);
+      return { ok: false as const, message: "חיבור Gmail נכשל." };
     }
   });
 // =============================================================================
@@ -244,11 +244,8 @@ export const searchCandidateEmails = createServerFn({ method: "POST" })
 
       return { ok: true as const, emails };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "חיפוש Gmail נכשל.",
-        emails: [],
-      };
+      console.error("[google-agent] searchCandidateEmails failed:", error);
+      return { ok: false as const, message: "חיפוש Gmail נכשל.", emails: [] };
     }
   });
 
@@ -400,9 +397,7 @@ export const createGmailDraft = createServerFn({ method: "POST" })
         draftLink,
       };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "יצירת טיוטה ב-Gmail נכשלה.",
-      };
+      console.error("[google-agent] createGmailDraft failed:", error);
+      return { ok: false as const, message: "יצירת טיוטה ב-Gmail נכשלה." };
     }
   });
