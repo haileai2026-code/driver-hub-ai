@@ -37,7 +37,7 @@ function headerValue(headers: Array<{ name?: string; value?: string }> | undefin
   return headers?.find((header) => header.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
-async function callGmail<T>(path: string): Promise<T> {
+async function callGmail<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const lovableKey = process.env.LOVABLE_API_KEY;
   const gmailKey = process.env.GOOGLE_MAIL_API_KEY;
 
@@ -45,16 +45,18 @@ async function callGmail<T>(path: string): Promise<T> {
   if (!gmailKey) throw new Error("GOOGLE_MAIL_API_KEY is not configured");
 
   const response = await fetch(`${GMAIL_GATEWAY_URL}${path}`, {
+    method: init?.method ?? "GET",
     headers: {
       Authorization: `Bearer ${lovableKey}`,
       "X-Connection-Api-Key": gmailKey,
       "Content-Type": "application/json",
     },
+    body: init?.body ? JSON.stringify(init.body) : undefined,
   });
 
   const text = await response.text();
   if (!response.ok) throw new Error(`Gmail API call failed [${response.status}]: ${text}`);
-  return JSON.parse(text) as T;
+  return text ? (JSON.parse(text) as T) : ({} as T);
 }
 
 async function buildAmharicReminder(input: {
