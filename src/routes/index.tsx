@@ -3949,6 +3949,38 @@ const FAILURE_CHANNEL_LABELS: Record<IntegrationFailure["channel"], string> = {
   other: "אחר",
 };
 
+type FailureErrorType =
+  | "all"
+  | "auth"
+  | "not_registered"
+  | "chat_not_found"
+  | "blocked"
+  | "rate_limit"
+  | "network"
+  | "other";
+
+const FAILURE_ERROR_TYPE_LABELS: Record<FailureErrorType, string> = {
+  all: "כל סוגי השגיאות",
+  auth: "טוקן/הרשאה",
+  not_registered: "נמען לא רשום",
+  chat_not_found: "Chat לא נמצא",
+  blocked: "חסום ע״י משתמש",
+  rate_limit: "הגבלת קצב",
+  network: "תקשורת/שרת",
+  other: "אחר",
+};
+
+function classifyFailureError(error: string): Exclude<FailureErrorType, "all"> {
+  const e = error.toLowerCase();
+  if (/token|טוקן|auth|unauthor|הרשא|expired|פג תוקף/.test(e)) return "auth";
+  if (/not registered|לא רשום|133010|allowed list|לא אושר/.test(e)) return "not_registered";
+  if (/chat not found|chat id לא נמצא/.test(e)) return "chat_not_found";
+  if (/blocked|חסם|חסום/.test(e)) return "blocked";
+  if (/rate|too many|429|עומס/.test(e)) return "rate_limit";
+  if (/network|fetch|timeout|5\d\d|שרת|תקשורת/.test(e)) return "network";
+  return "other";
+}
+
 function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
   const [failures, setFailures] = useState<IntegrationFailure[]>([]);
   const [loading, setLoading] = useState(false);
