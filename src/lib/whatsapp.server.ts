@@ -9,7 +9,17 @@ export type WhatsAppSendResult =
 
 function normalizePhone(phone: string): string {
   // Meta requires E.164 without leading "+".
-  return phone.replace(/[^\d]/g, "");
+  let digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  // Israeli local format: 05XXXXXXXX -> 9725XXXXXXXX
+  if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
+  // Catch double-prefixed like 9720548... -> 972548...
+  if (digits.startsWith("9720")) digits = `972${digits.slice(4)}`;
+  return digits;
+}
+
+function isValidE164(digits: string): boolean {
+  // E.164: 8-15 digits, no leading zero
+  return /^[1-9]\d{7,14}$/.test(digits);
 }
 
 export async function sendWhatsAppText(
