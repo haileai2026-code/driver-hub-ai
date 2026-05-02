@@ -46,7 +46,10 @@ export const getAppSettings = createServerFn({ method: "POST" })
       .select("key,value,updated_at")
       .in("key", ["beny_whatsapp", "beny_telegram", "morning_summary"]);
 
-    if (error) return { ok: false as const, message: error.message };
+    if (error) {
+      console.error("[app-settings] read failed", error);
+      return { ok: false as const, message: "טעינת ההגדרות נכשלה. אנא נסה שוב." };
+    }
 
     const map = new Map(rows?.map((r) => [r.key, r]) ?? []);
     const beny = (map.get("beny_whatsapp")?.value ?? {}) as { phone?: string };
@@ -100,7 +103,10 @@ export const saveAppSettings = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("app_settings")
         .upsert(row, { onConflict: "key" });
-      if (error) return { ok: false as const, message: error.message };
+      if (error) {
+        console.error("[app-settings] save failed", error);
+        return { ok: false as const, message: "שמירת ההגדרות נכשלה. אנא נסה שוב." };
+      }
     }
 
     return { ok: true as const, message: "ההגדרות נשמרו." };

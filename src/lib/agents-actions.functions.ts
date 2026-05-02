@@ -69,7 +69,10 @@ export const recordAgentAction = createServerFn({ method: "POST" })
       follow_up_required: data.followUpRequired ?? false,
     });
 
-    if (error) return { ok: false as const, message: error.message };
+    if (error) {
+      console.error("[agents-actions] insert failed", error);
+      return { ok: false as const, message: "רישום הפעולה נכשל. אנא נסה שוב." };
+    }
 
     if (data.followUpAt) {
       await supabaseAdmin
@@ -100,7 +103,8 @@ export const saveCandidateRating = createServerFn({ method: "POST" })
       .eq("id", data.candidateId)
       .maybeSingle();
     if (readError || !candidate) {
-      return { ok: false as const, message: readError?.message ?? "מועמד לא נמצא." };
+      if (readError) console.error("[agents-actions] read candidate failed", readError);
+      return { ok: false as const, message: "מועמד לא נמצא." };
     }
 
     const profile =
@@ -118,7 +122,10 @@ export const saveCandidateRating = createServerFn({ method: "POST" })
         updated_at: new Date().toISOString(),
       })
       .eq("id", data.candidateId);
-    if (updateError) return { ok: false as const, message: updateError.message };
+    if (updateError) {
+      console.error("[agents-actions] update failed", updateError);
+      return { ok: false as const, message: "עדכון הדירוג נכשל. אנא נסה שוב." };
+    }
 
     await supabaseAdmin.from("operation_logs").insert({
       candidate_id: data.candidateId,
