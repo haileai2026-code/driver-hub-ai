@@ -3563,7 +3563,7 @@ function SettingsPage({
       </Panel>
 
       <Panel title="בדיקת ערוצי תקשורת">
-        <IntegrationTester isSuperAdmin={isSuperAdmin} />
+        <IntegrationTester isSuperAdmin={isSuperAdmin} defaultTelegramChatId={benyTelegramChatId} />
       </Panel>
 
       <Panel title="WhatsApp — תבניות סטטוס ושפה">
