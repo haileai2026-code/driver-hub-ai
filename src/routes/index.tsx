@@ -3408,6 +3408,7 @@ function SettingsPage({
   agentStatuses: AutomationAgentStatus[];
 }) {
   const [benyWhatsapp, setBenyWhatsapp] = useState("");
+  const [benyTelegramChatId, setBenyTelegramChatId] = useState("");
   const [summaryTime, setSummaryTime] = useState("08:00");
   const [summaryEnabled, setSummaryEnabled] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -3425,6 +3426,7 @@ function SettingsPage({
       const res = await getAppSettings({ data: { accessToken } });
       if (cancelled || !res.ok) return;
       setBenyWhatsapp(res.settings.benyWhatsapp);
+      setBenyTelegramChatId(res.settings.benyTelegramChatId ?? "");
       setSummaryTime(res.settings.morningSummaryTime);
       setSummaryEnabled(res.settings.morningSummaryEnabled);
       setUpdatedAt(res.settings.updatedAt);
@@ -3446,6 +3448,7 @@ function SettingsPage({
       data: {
         accessToken,
         benyWhatsapp,
+        benyTelegramChatId,
         morningSummaryTime: summaryTime,
         morningSummaryEnabled: summaryEnabled,
       },
@@ -3475,6 +3478,19 @@ function SettingsPage({
             </label>
             <p className="text-xs text-muted-foreground">
               מספר זה ישמש לסיכום הבוקר היומי דרך WhatsApp Business API.
+            </p>
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground">Telegram Chat ID</span>
+              <input
+                dir="ltr"
+                placeholder="123456789"
+                value={benyTelegramChatId}
+                onChange={(e) => setBenyTelegramChatId(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              מזהה זה ישמש אוטומטית לכל ההתראות דרך Telegram.
             </p>
             <div className="flex items-center gap-3 pt-1">
               <Button variant="tactical" onClick={handleSave} disabled={status.kind === "saving"}>
@@ -3547,7 +3563,7 @@ function SettingsPage({
       </Panel>
 
       <Panel title="בדיקת ערוצי תקשורת">
-        <IntegrationTester isSuperAdmin={isSuperAdmin} />
+        <IntegrationTester isSuperAdmin={isSuperAdmin} defaultTelegramChatId={benyTelegramChatId} />
       </Panel>
 
       <Panel title="WhatsApp — תבניות סטטוס ושפה">
@@ -3567,13 +3583,27 @@ function SettingsPage({
   );
 }
 
-function IntegrationTester({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+function IntegrationTester({
+  isSuperAdmin,
+  defaultTelegramChatId = "",
+}: {
+  isSuperAdmin: boolean;
+  defaultTelegramChatId?: string;
+}) {
   const [channel, setChannel] = useState<"slack" | "telegram" | "whatsapp">("slack");
   const [target, setTarget] = useState("");
   const [message, setMessage] = useState("בדיקה מהמערכת — Haile AI 🚀");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const sendTest = useServerFn(sendTestNotification);
+
+  // Auto-fill the saved Telegram Chat ID when switching to telegram and target is empty.
+  useEffect(() => {
+    if (channel === "telegram" && !target && defaultTelegramChatId) {
+      setTarget(defaultTelegramChatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, defaultTelegramChatId]);
 
   if (!isSuperAdmin) {
     return <SettingsGrid items={["רק SUPER_ADMIN יכול לבצע בדיקות שליחה."]} />;

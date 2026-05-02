@@ -9,6 +9,7 @@ const AccessTokenSchema = z.object({
 
 const SaveSettingsSchema = AccessTokenSchema.extend({
   benyWhatsapp: z.string().trim().max(40),
+  benyTelegramChatId: z.string().trim().max(40).default(""),
   morningSummaryTime: z
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "פורמט שעה לא תקין (HH:MM).")
@@ -43,12 +44,13 @@ export const getAppSettings = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("app_settings")
       .select("key,value,updated_at")
-      .in("key", ["beny_whatsapp", "morning_summary"]);
+      .in("key", ["beny_whatsapp", "beny_telegram", "morning_summary"]);
 
     if (error) return { ok: false as const, message: error.message };
 
     const map = new Map(rows?.map((r) => [r.key, r]) ?? []);
     const beny = (map.get("beny_whatsapp")?.value ?? {}) as { phone?: string };
+    const telegram = (map.get("beny_telegram")?.value ?? {}) as { chat_id?: string };
     const summary = (map.get("morning_summary")?.value ?? {}) as {
       time_il?: string;
       enabled?: boolean;
@@ -58,10 +60,12 @@ export const getAppSettings = createServerFn({ method: "POST" })
       ok: true as const,
       settings: {
         benyWhatsapp: beny.phone ?? "",
+        benyTelegramChatId: telegram.chat_id ?? "",
         morningSummaryTime: summary.time_il ?? "08:00",
         morningSummaryEnabled: summary.enabled ?? true,
         updatedAt:
           map.get("beny_whatsapp")?.updated_at ??
+          map.get("beny_telegram")?.updated_at ??
           map.get("morning_summary")?.updated_at ??
           null,
       },
@@ -78,6 +82,10 @@ export const saveAppSettings = createServerFn({ method: "POST" })
       {
         key: "beny_whatsapp",
         value: { phone: data.benyWhatsapp.replace(/[^\d+]/g, "") },
+      },
+      {
+        key: "beny_telegram",
+        value: { chat_id: data.benyTelegramChatId.replace(/[^\d-]/g, "") },
       },
       {
         key: "morning_summary",
