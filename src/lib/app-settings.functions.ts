@@ -35,17 +35,6 @@ async function requireSuperAdmin(accessToken: string) {
   return { ok: true as const, userId: userData.user.id };
 }
 
-/** Server-only helper: fetch saved Beny Telegram chat id (no auth needed; admin client). */
-export async function getSavedBenyTelegramChatId(): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("app_settings")
-    .select("value")
-    .eq("key", "beny_telegram")
-    .maybeSingle();
-  const value = (data?.value ?? {}) as { chat_id?: string };
-  return (value.chat_id ?? "").trim();
-}
-
 export const getAppSettings = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AccessTokenSchema.parse(input))
   .handler(async ({ data }) => {
