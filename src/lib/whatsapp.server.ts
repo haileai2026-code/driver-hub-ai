@@ -34,7 +34,9 @@ export async function sendWhatsAppText(
   }
 
   const to = normalizePhone(toPhone);
-  if (!to) return { ok: false, error: "Missing recipient phone number." };
+  if (!to) return { ok: false, error: "מספר נמען חסר." };
+  if (!isValidE164(to))
+    return { ok: false, error: `מספר WhatsApp לא תקין: ${toPhone}. נדרש פורמט E.164 (למשל 972541234567).` };
 
   const res = await fetch(
     `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/messages`,
