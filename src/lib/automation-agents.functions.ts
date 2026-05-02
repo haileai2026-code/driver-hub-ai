@@ -338,7 +338,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
         status: "failed",
         error: rawMsg,
       });
-      return { ok: false as const, message: "שליחת ההודעה נכשלה. בדקו את הגדרות הערוץ ונסו שוב." };
+      return { ok: false as const, message: `שליחה נכשלה: ${rawMsg}` };
     }
   });
 
