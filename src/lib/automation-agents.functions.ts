@@ -462,17 +462,27 @@ function parseIntegrationFailureRow(row: {
   translated_hebrew: string | null;
   source_message: string | null;
   created_at: string;
+  interaction_type: string | null;
 }): IntegrationFailure {
-  const channelRaw = (row.operator_name ?? "").replace(/^Integration:/, "").trim();
-  const channel: IntegrationFailure["channel"] =
-    channelRaw === "slack" || channelRaw === "telegram" || channelRaw === "whatsapp"
-      ? channelRaw
-      : "other";
+  const channelRaw = (row.operator_name ?? "").replace(/^Integration:/, "").trim().toLowerCase();
+  const itype = (row.interaction_type ?? "").toLowerCase();
+  let channel: IntegrationFailure["channel"] = "other";
+  if (channelRaw === "slack" || channelRaw === "telegram" || channelRaw === "whatsapp") {
+    channel = channelRaw;
+  } else if (itype.startsWith("whatsapp_")) {
+    channel = "whatsapp";
+  } else if (itype.startsWith("telegram_")) {
+    channel = "telegram";
+  } else if (itype.startsWith("slack_")) {
+    channel = "slack";
+  }
+
   const notes = row.notes_hebrew ?? "";
-  // notes format: [נכשל <iso>] ערוץ <ch> → <target> | <error>
-  const arrowIdx = notes.indexOf("→");
   let target = "";
   let error = "";
+
+  // Format A (test): [נכשל <iso>] ערוץ <ch> → <target> | <error>
+  const arrowIdx = notes.indexOf("→");
   if (arrowIdx >= 0) {
     const tail = notes.slice(arrowIdx + 1).trim();
     const pipeIdx = tail.indexOf("|");
@@ -482,7 +492,20 @@ function parseIntegrationFailureRow(row: {
     } else {
       target = tail;
     }
+  } else {
+    // Format B (automation reminder): [נכשל <iso>] <error> | <body>
+    const bracketEnd = notes.indexOf("]");
+    if (bracketEnd >= 0) {
+      const tail = notes.slice(bracketEnd + 1).trim();
+      const pipeIdx = tail.indexOf("|");
+      error = pipeIdx >= 0 ? tail.slice(0, pipeIdx).trim() : tail;
+    }
   }
+
+  // Friendlier surface
+  if (channel === "whatsapp" && error) error = friendlyWhatsAppError(error);
+  if (channel === "telegram" && error) error = friendlyTelegramError(error);
+
   return {
     id: row.id,
     channel,
