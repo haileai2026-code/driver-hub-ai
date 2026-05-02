@@ -4013,10 +4013,20 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
     return <SettingsGrid items={["רק מורשים יכולים לראות שגיאות ערוצים."]} />;
   }
 
-  const filtered = filter === "all" ? failures : failures.filter((f) => f.channel === filter);
+  const failuresWithType = failures.map((f) => ({ ...f, errorType: classifyFailureError(f.error) }));
+  const filtered = failuresWithType.filter(
+    (f) =>
+      (filter === "all" || f.channel === filter) &&
+      (errorTypeFilter === "all" || f.errorType === errorTypeFilter),
+  );
 
   const counts = failures.reduce<Record<string, number>>((acc, f) => {
     acc[f.channel] = (acc[f.channel] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const errorTypeCounts = failuresWithType.reduce<Record<string, number>>((acc, f) => {
+    acc[f.errorType] = (acc[f.errorType] ?? 0) + 1;
     return acc;
   }, {});
 
