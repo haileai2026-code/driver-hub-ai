@@ -109,7 +109,8 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
 
           const result = await sendWhatsAppText(beny.phone, lines.join("\n"));
           if (!result.ok) {
-            return json({ ok: false, error: result.error }, 502);
+            console.error("[morning-summary] WhatsApp send failed:", result.error);
+            return json({ ok: false, error: "Notification delivery failed" }, 502);
           }
 
           return json({ ok: true, messageId: result.messageId });
