@@ -2723,8 +2723,267 @@ function SolAgentPanel({
         >
           <Bell className="h-4 w-4" /> צור תזכורת ושמור ביומן
         </Button>
+        <SolGmailSection selected={selected} canEdit={canEdit} />
       </div>
     </AgentShell>
+  );
+}
+
+function SolGmailSection({
+  selected,
+  canEdit,
+}: {
+  selected: Candidate | null;
+  canEdit: boolean;
+}) {
+  const searchEmails = useServerFn(searchCandidateEmails);
+  const draftEmail = useServerFn(draftCandidateFollowUpEmail);
+  const createDraft = useServerFn(createGmailDraft);
+
+  const [emails, setEmails] = useState<CandidateEmail[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const [draftSubject, setDraftSubject] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+  const [draftTo, setDraftTo] = useState("");
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [sendBusy, setSendBusy] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
+  const [draftLink, setDraftLink] = useState<string | null>(null);
+
+  const candidateId = selected?.id ?? null;
+
+  useEffect(() => {
+    setEmails([]);
+    setEmailError(null);
+    setDraftSubject("");
+    setDraftBody("");
+    setDraftTo("");
+    setDraftStatus(null);
+    setDraftLink(null);
+    if (!candidateId || !selected) return;
+
+    let cancelled = false;
+    (async () => {
+      setLoadingEmails(true);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          if (!cancelled) setEmailError("יש להתחבר מחדש.");
+          return;
+        }
+        const res = await searchEmails({
+          data: {
+            accessToken,
+            candidateName: selected.name,
+            candidatePhone: selected.phone,
+            maxResults: 3,
+          },
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setEmailError(res.message ?? "חיפוש Gmail נכשל.");
+          setEmails([]);
+        } else {
+          setEmails(res.emails);
+        }
+      } catch (err) {
+        if (!cancelled)
+          setEmailError(err instanceof Error ? err.message : "חיפוש Gmail נכשל.");
+      } finally {
+        if (!cancelled) setLoadingEmails(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [candidateId, selected, searchEmails]);
+
+  const buildDraft = async () => {
+    if (!selected) return;
+    setDraftBusy(true);
+    setDraftStatus(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setDraftStatus("יש להתחבר מחדש.");
+        return;
+      }
+      const recentContext = emails
+        .slice(0, 3)
+        .map((e) => `- ${e.subject}: ${e.snippet}`)
+        .join("\n");
+      const res = await draftEmail({
+        data: {
+          accessToken,
+          candidateName: selected.name,
+          candidatePhone: selected.phone,
+          candidateCity: selected.city,
+          candidateStage: selected.stage,
+          candidateLicense: selected.licenseStatus,
+          candidateLanguage: selected.langCode,
+          recentEmailContext: recentContext || undefined,
+        },
+      });
+      if (!res.ok) {
+        setDraftStatus(res.message ?? "יצירת טיוטה נכשלה.");
+        return;
+      }
+      setDraftSubject(res.subject);
+      setDraftBody(res.body);
+      setDraftStatus("טיוטה נוצרה — ניתן לערוך לפני השליחה.");
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
+  const sendToGmail = async () => {
+    if (!selected) return;
+    if (!draftTo.trim() || !draftSubject.trim() || !draftBody.trim()) {
+      setDraftStatus("חסרים נמען / נושא / תוכן.");
+      return;
+    }
+    setSendBusy(true);
+    setDraftStatus(null);
+    setDraftLink(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setDraftStatus("יש להתחבר מחדש.");
+        return;
+      }
+      const res = await createDraft({
+        data: {
+          accessToken,
+          to: draftTo.trim(),
+          subject: draftSubject.trim(),
+          body: draftBody,
+        },
+      });
+      if (!res.ok) {
+        setDraftStatus(res.message ?? "יצירת טיוטה ב-Gmail נכשלה.");
+        return;
+      }
+      setDraftStatus(res.message);
+      setDraftLink(res.draftLink ?? null);
+    } finally {
+      setSendBusy(false);
+    }
+  };
+
+  if (!selected) {
+    return (
+      <div className="rounded-md border border-dashed border-border bg-surface p-3 text-xs text-muted-foreground">
+        בחר מועמד כדי לראות מיילים אחרונים מ-Gmail.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-surface p-3">
+      <div className="flex items-center justify-between text-xs font-bold">
+        <span className="flex items-center gap-1">
+          <Mail className="h-4 w-4 text-primary" /> Gmail — מיילים אחרונים
+        </span>
+        <span className="text-muted-foreground">{loadingEmails ? "טוען…" : `${emails.length} תוצאות`}</span>
+      </div>
+
+      {emailError && (
+        <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+          {emailError}
+        </div>
+      )}
+
+      {!loadingEmails && !emailError && emails.length === 0 && (
+        <div className="text-xs text-muted-foreground">לא נמצאו מיילים תואמים למועמד.</div>
+      )}
+
+      <ul className="space-y-2">
+        {emails.map((email) => (
+          <li key={email.id} className="rounded border border-border bg-background p-2 text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{email.subject}</div>
+                <div className="truncate text-muted-foreground">מאת: {email.from}</div>
+              </div>
+              <a
+                href={email.webLink}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 text-primary underline"
+              >
+                פתח
+              </a>
+            </div>
+            {email.date && <div className="text-[10px] text-muted-foreground">{email.date}</div>}
+            <div className="mt-1 line-clamp-2 text-muted-foreground">{email.snippet}</div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="space-y-2 border-t border-border pt-2">
+        <Button
+          variant="outline"
+          onClick={buildDraft}
+          disabled={!canEdit || draftBusy}
+          className="w-full"
+        >
+          <Bot className="h-4 w-4" /> {draftBusy ? "מנסח טיוטה…" : "צור טיוטת מעקב עם SOL"}
+        </Button>
+
+        {(draftSubject || draftBody) && (
+          <div className="space-y-2">
+            <input
+              type="email"
+              value={draftTo}
+              onChange={(e) => setDraftTo(e.target.value)}
+              placeholder="כתובת מייל של המועמד"
+              dir="ltr"
+              className="min-h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
+            />
+            <input
+              type="text"
+              value={draftSubject}
+              onChange={(e) => setDraftSubject(e.target.value)}
+              placeholder="נושא"
+              className="min-h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
+            />
+            <textarea
+              value={draftBody}
+              onChange={(e) => setDraftBody(e.target.value)}
+              className="min-h-[140px] w-full rounded-md border border-border bg-background p-2 text-sm"
+            />
+            <Button
+              variant="command"
+              onClick={sendToGmail}
+              disabled={!canEdit || sendBusy || !draftTo.trim()}
+              className="w-full"
+            >
+              <Send className="h-4 w-4" /> {sendBusy ? "שולח ל-Gmail…" : "שלח מייל"}
+            </Button>
+          </div>
+        )}
+
+        {draftStatus && (
+          <div className="text-xs text-muted-foreground">
+            {draftStatus}
+            {draftLink && (
+              <>
+                {" "}
+                <a href={draftLink} target="_blank" rel="noreferrer" className="text-primary underline">
+                  פתח טיוטה ב-Gmail
+                </a>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
