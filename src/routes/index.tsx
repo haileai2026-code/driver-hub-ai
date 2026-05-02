@@ -64,7 +64,13 @@ import {
 import { cn } from "@/lib/utils";
 import { createFirstSuperAdmin, inviteSystemUser } from "@/lib/auth.functions";
 import { importCandidatesFromRows } from "@/lib/candidate-import.functions";
-import { generateGmailWhatsAppReminder } from "@/lib/google-agent.functions";
+import {
+  generateGmailWhatsAppReminder,
+  searchCandidateEmails,
+  draftCandidateFollowUpEmail,
+  createGmailDraft,
+  type CandidateEmail,
+} from "@/lib/google-agent.functions";
 import { applyHaileAiOperation, generateHaileAiText } from "@/lib/haile-ai.functions";
 import {
   checkAutomationAgents,
