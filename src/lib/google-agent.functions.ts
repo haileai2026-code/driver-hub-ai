@@ -41,8 +41,10 @@ async function callGmail<T>(path: string, init?: { method?: string; body?: unkno
   const lovableKey = process.env.LOVABLE_API_KEY;
   const gmailKey = process.env.GOOGLE_MAIL_API_KEY;
 
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!gmailKey) throw new Error("GOOGLE_MAIL_API_KEY is not configured");
+  if (!lovableKey || !gmailKey) {
+    console.error("[google-agent] Missing Gmail gateway configuration");
+    throw new Error("Gmail service unavailable");
+  }
 
   const response = await fetch(`${GMAIL_GATEWAY_URL}${path}`, {
     method: init?.method ?? "GET",
