@@ -3408,6 +3408,7 @@ function SettingsPage({
   agentStatuses: AutomationAgentStatus[];
 }) {
   const [benyWhatsapp, setBenyWhatsapp] = useState("");
+  const [benyTelegramChatId, setBenyTelegramChatId] = useState("");
   const [summaryTime, setSummaryTime] = useState("08:00");
   const [summaryEnabled, setSummaryEnabled] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
