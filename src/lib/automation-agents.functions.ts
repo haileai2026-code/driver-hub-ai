@@ -51,9 +51,37 @@ async function getAuthorizedUser(accessToken: string, allowedRoles: AppRole[]) {
 
 function normalizeMetaPhone(phone: string | null) {
   if (!phone) return "";
-  const digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
-  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
+  let digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
+  if (digits.startsWith("9720")) digits = `972${digits.slice(4)}`;
   return digits;
+}
+
+function isValidE164Phone(digits: string): boolean {
+  return /^[1-9]\d{7,14}$/.test(digits);
+}
+
+function isValidTelegramChatId(value: string): boolean {
+  // Telegram chat_id must be a numeric ID (positive for users, negative for groups/channels).
+  // Usernames like "@bot" or phone numbers are NOT valid for sendMessage.
+  return /^-?\d{4,}$/.test(value.trim());
+}
+
+function friendlyWhatsAppError(raw: string): string {
+  if (/133010/.test(raw)) return "המספר אינו רשום ב-WhatsApp או לא אושר כנמען בסביבת הבדיקה של Meta.";
+  if (/Authentication|OAuthException|expired|invalid token/i.test(raw))
+    return "WHATSAPP_ACCESS_TOKEN פג תוקף או לא תקין. צור טוקן חדש ב-Meta Business.";
+  if (/recipient phone number not in allowed list/i.test(raw))
+    return "המספר לא אושר כנמען. הוסף אותו ב-WhatsApp Manager → API Setup → To.";
+  return raw;
+}
+
+function friendlyTelegramError(raw: string): string {
+  if (/chat not found/i.test(raw))
+    return "Chat ID לא נמצא. השתמש ב-chat_id מספרי (לא username/טלפון). שלח /start לבוט וקח את chat.id מ-getUpdates.";
+  if (/bot was blocked/i.test(raw)) return "המשתמש חסם את הבוט בטלגרם.";
+  if (/unauthorized/i.test(raw)) return "TELEGRAM_API_KEY לא תקין.";
+  return raw;
 }
 
 async function verifyConnector(connectorApiKey: string | undefined): Promise<{
@@ -225,9 +253,13 @@ export const sendTestNotification = createServerFn({ method: "POST" })
       if (data.channel === "telegram") {
         const tgKey = process.env.TELEGRAM_API_KEY;
         if (!lovableKey || !tgKey) throw new Error("Telegram לא מחובר.");
-        const chatId = data.target.trim() || (await getSavedBenyTelegramChatId());
+        const chatId = (data.target.trim() || (await getSavedBenyTelegramChatId())).trim();
         if (!chatId)
           throw new Error("לא הוגדר Telegram Chat ID. הזן יעד או שמור Chat ID בהגדרות פרופיל מנכ״ל.");
+        if (!isValidTelegramChatId(chatId))
+          throw new Error(
+            `Telegram Chat ID לא תקין: "${chatId}". נדרש מזהה מספרי (למשל 123456789), לא username או מספר טלפון. שלח /start לבוט וקח את chat.id.`,
+          );
         const res = await fetch(
           "https://connector-gateway.lovable.dev/telegram/sendMessage",
           {
@@ -237,7 +269,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
               "X-Connection-Api-Key": tgKey,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ chat_id: chatId, text: data.message }),
+            body: JSON.stringify({ chat_id: Number(chatId), text: data.message }),
           },
         );
         const json = (await res.json().catch(() => ({}))) as {
@@ -245,7 +277,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
           description?: string;
         };
         if (!res.ok || json.ok === false)
-          throw new Error(json.description ?? `Telegram שגיאה ${res.status}`);
+          throw new Error(friendlyTelegramError(json.description ?? `Telegram שגיאה ${res.status}`));
         await logIntegrationEvent({
           channel: "telegram",
           target: chatId,
@@ -259,6 +291,11 @@ export const sendTestNotification = createServerFn({ method: "POST" })
       const token = process.env.WHATSAPP_ACCESS_TOKEN;
       const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
       if (!token || !phoneId) throw new Error("WhatsApp לא מחובר.");
+      const normalizedTo = normalizeMetaPhone(data.target);
+      if (!isValidE164Phone(normalizedTo))
+        throw new Error(
+          `מספר WhatsApp לא תקין: "${data.target}". נדרש פורמט E.164 (למשל 972541234567).`,
+        );
       const res = await fetch(
         `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
         {
@@ -269,7 +306,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             messaging_product: "whatsapp",
-            to: normalizeMetaPhone(data.target),
+            to: normalizedTo,
             type: "text",
             text: { body: data.message },
           }),
@@ -280,10 +317,10 @@ export const sendTestNotification = createServerFn({ method: "POST" })
         messages?: Array<{ id: string }>;
       };
       if (!res.ok)
-        throw new Error(json.error?.message ?? `WhatsApp שגיאה ${res.status}`);
+        throw new Error(friendlyWhatsAppError(json.error?.message ?? `WhatsApp שגיאה ${res.status}`));
       await logIntegrationEvent({
         channel: "whatsapp",
-        target: data.target,
+        target: normalizedTo,
         message: data.message,
         status: "sent",
       });
@@ -301,7 +338,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
         status: "failed",
         error: rawMsg,
       });
-      return { ok: false as const, message: "שליחת ההודעה נכשלה. בדקו את הגדרות הערוץ ונסו שוב." };
+      return { ok: false as const, message: `שליחה נכשלה: ${rawMsg}` };
     }
   });
 
@@ -425,17 +462,27 @@ function parseIntegrationFailureRow(row: {
   translated_hebrew: string | null;
   source_message: string | null;
   created_at: string;
+  interaction_type: string | null;
 }): IntegrationFailure {
-  const channelRaw = (row.operator_name ?? "").replace(/^Integration:/, "").trim();
-  const channel: IntegrationFailure["channel"] =
-    channelRaw === "slack" || channelRaw === "telegram" || channelRaw === "whatsapp"
-      ? channelRaw
-      : "other";
+  const channelRaw = (row.operator_name ?? "").replace(/^Integration:/, "").trim().toLowerCase();
+  const itype = (row.interaction_type ?? "").toLowerCase();
+  let channel: IntegrationFailure["channel"] = "other";
+  if (channelRaw === "slack" || channelRaw === "telegram" || channelRaw === "whatsapp") {
+    channel = channelRaw;
+  } else if (itype.startsWith("whatsapp_")) {
+    channel = "whatsapp";
+  } else if (itype.startsWith("telegram_")) {
+    channel = "telegram";
+  } else if (itype.startsWith("slack_")) {
+    channel = "slack";
+  }
+
   const notes = row.notes_hebrew ?? "";
-  // notes format: [נכשל <iso>] ערוץ <ch> → <target> | <error>
-  const arrowIdx = notes.indexOf("→");
   let target = "";
   let error = "";
+
+  // Format A (test): [נכשל <iso>] ערוץ <ch> → <target> | <error>
+  const arrowIdx = notes.indexOf("→");
   if (arrowIdx >= 0) {
     const tail = notes.slice(arrowIdx + 1).trim();
     const pipeIdx = tail.indexOf("|");
@@ -445,7 +492,20 @@ function parseIntegrationFailureRow(row: {
     } else {
       target = tail;
     }
+  } else {
+    // Format B (automation reminder): [נכשל <iso>] <error> | <body>
+    const bracketEnd = notes.indexOf("]");
+    if (bracketEnd >= 0) {
+      const tail = notes.slice(bracketEnd + 1).trim();
+      const pipeIdx = tail.indexOf("|");
+      error = pipeIdx >= 0 ? tail.slice(0, pipeIdx).trim() : tail;
+    }
   }
+
+  // Friendlier surface
+  if (channel === "whatsapp" && error) error = friendlyWhatsAppError(error);
+  if (channel === "telegram" && error) error = friendlyTelegramError(error);
+
   return {
     id: row.id,
     channel,
