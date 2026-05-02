@@ -3985,6 +3985,7 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
   const [failures, setFailures] = useState<IntegrationFailure[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | IntegrationFailure["channel"]>("all");
+  const [errorTypeFilter, setErrorTypeFilter] = useState<FailureErrorType>("all");
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const fetchFailures = useServerFn(getRecentIntegrationFailures);
