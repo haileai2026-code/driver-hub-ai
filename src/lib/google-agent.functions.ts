@@ -150,10 +150,8 @@ export const generateGmailWhatsAppReminder = createServerFn({ method: "POST" })
         email: { from, subject, snippet },
       };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "חיבור Gmail נכשל.",
-      };
+      console.error("[google-agent] generateGmailWhatsAppReminder failed:", error);
+      return { ok: false as const, message: "חיבור Gmail נכשל." };
     }
   });
 // =============================================================================
@@ -246,11 +244,8 @@ export const searchCandidateEmails = createServerFn({ method: "POST" })
 
       return { ok: true as const, emails };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "חיפוש Gmail נכשל.",
-        emails: [],
-      };
+      console.error("[google-agent] searchCandidateEmails failed:", error);
+      return { ok: false as const, message: "חיפוש Gmail נכשל.", emails: [] };
     }
   });
 
@@ -402,9 +397,7 @@ export const createGmailDraft = createServerFn({ method: "POST" })
         draftLink,
       };
     } catch (error) {
-      return {
-        ok: false as const,
-        message: error instanceof Error ? error.message : "יצירת טיוטה ב-Gmail נכשלה.",
-      };
+      console.error("[google-agent] createGmailDraft failed:", error);
+      return { ok: false as const, message: "יצירת טיוטה ב-Gmail נכשלה." };
     }
   });

@@ -37,7 +37,8 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
             .in("key", ["beny_whatsapp", "morning_summary"]);
 
           if (settingsError) {
-            return json({ ok: false, error: settingsError.message }, 500);
+            console.error("[morning-summary] settings fetch failed:", settingsError.message);
+            return json({ ok: false, error: "Failed to load settings" }, 500);
           }
 
           const map = new Map(settingsRows?.map((r) => [r.key, r.value]) ?? []);
@@ -113,8 +114,8 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
 
           return json({ ok: true, messageId: result.messageId });
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          return json({ ok: false, error: message }, 500);
+          console.error("[morning-summary] handler failed:", err);
+          return json({ ok: false, error: "Internal server error" }, 500);
         }
       },
     },
