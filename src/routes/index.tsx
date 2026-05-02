@@ -3583,13 +3583,27 @@ function SettingsPage({
   );
 }
 
-function IntegrationTester({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+function IntegrationTester({
+  isSuperAdmin,
+  defaultTelegramChatId = "",
+}: {
+  isSuperAdmin: boolean;
+  defaultTelegramChatId?: string;
+}) {
   const [channel, setChannel] = useState<"slack" | "telegram" | "whatsapp">("slack");
   const [target, setTarget] = useState("");
   const [message, setMessage] = useState("בדיקה מהמערכת — Haile AI 🚀");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const sendTest = useServerFn(sendTestNotification);
+
+  // Auto-fill the saved Telegram Chat ID when switching to telegram and target is empty.
+  useEffect(() => {
+    if (channel === "telegram" && !target && defaultTelegramChatId) {
+      setTarget(defaultTelegramChatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, defaultTelegramChatId]);
 
   if (!isSuperAdmin) {
     return <SettingsGrid items={["רק SUPER_ADMIN יכול לבצע בדיקות שליחה."]} />;
