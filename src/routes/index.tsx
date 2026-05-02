@@ -3479,6 +3479,19 @@ function SettingsPage({
             <p className="text-xs text-muted-foreground">
               מספר זה ישמש לסיכום הבוקר היומי דרך WhatsApp Business API.
             </p>
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground">Telegram Chat ID</span>
+              <input
+                dir="ltr"
+                placeholder="123456789"
+                value={benyTelegramChatId}
+                onChange={(e) => setBenyTelegramChatId(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              מזהה זה ישמש אוטומטית לכל ההתראות דרך Telegram.
+            </p>
             <div className="flex items-center gap-3 pt-1">
               <Button variant="tactical" onClick={handleSave} disabled={status.kind === "saving"}>
                 {status.kind === "saving" ? "שומר..." : "שמור"}
