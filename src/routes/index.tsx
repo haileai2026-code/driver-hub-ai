@@ -3448,6 +3448,7 @@ function SettingsPage({
       data: {
         accessToken,
         benyWhatsapp,
+        benyTelegramChatId,
         morningSummaryTime: summaryTime,
         morningSummaryEnabled: summaryEnabled,
       },
