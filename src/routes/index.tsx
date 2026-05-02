@@ -4122,6 +4122,7 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
             נקה
           </button>
         )}
+      </div>
 
       {statusMsg && (
         <div
