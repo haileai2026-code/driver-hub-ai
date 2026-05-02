@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendWhatsAppText } from "@/lib/whatsapp.server";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+const APP_SECRET = process.env.WHATSAPP_APP_SECRET;
 // WhatsApp sends the sender phone in E.164 without "+": 0548739473 → 972548739473
 const BENY_PHONE = "972548739473";
 
@@ -53,7 +55,24 @@ export const Route = createFileRoute("/api/whatsapp/webhook")({
 
       POST: async ({ request }: { request: Request }) => {
         try {
-          const body = (await request.json()) as WaWebhookBody;
+          if (!APP_SECRET) {
+            console.error("WHATSAPP_APP_SECRET not configured");
+            return new Response("Forbidden", { status: 403 });
+          }
+          const sigHeader = request.headers.get("x-hub-signature-256") ?? "";
+          const rawBody = await request.text();
+          const expected =
+            "sha256=" +
+            createHmac("sha256", APP_SECRET).update(rawBody).digest("hex");
+          const sigBuf = Buffer.from(sigHeader);
+          const expBuf = Buffer.from(expected);
+          if (
+            sigBuf.length !== expBuf.length ||
+            !timingSafeEqual(sigBuf, expBuf)
+          ) {
+            return new Response("Forbidden", { status: 403 });
+          }
+          const body = JSON.parse(rawBody) as WaWebhookBody;
           const value = body.entry?.[0]?.changes?.[0]?.value;
 
           // Handle delivery status callbacks (sent / delivered / read / failed)

@@ -6,8 +6,20 @@ import { sendWhatsAppText } from "@/lib/whatsapp.server";
 export const Route = createFileRoute("/api/public/hooks/morning-summary")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
         try {
+          const expectedSecret = process.env.MORNING_SUMMARY_SECRET;
+          if (!expectedSecret) {
+            console.error("MORNING_SUMMARY_SECRET not configured");
+            return json({ ok: false, error: "Unauthorized" }, 401);
+          }
+          const provided =
+            request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+            request.headers.get("x-morning-summary-secret") ??
+            "";
+          if (provided !== expectedSecret) {
+            return json({ ok: false, error: "Unauthorized" }, 401);
+          }
           const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
           const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

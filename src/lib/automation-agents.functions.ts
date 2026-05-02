@@ -327,7 +327,10 @@ export const sendMissingDocsWhatsAppReminders = createServerFn({ method: "POST" 
       .neq("stage", "Placed")
       .limit(50);
 
-    if (error) return { ok: false as const, message: error.message, sent: 0, skipped: 0 };
+    if (error) {
+      console.error("[automation-agents] candidates query failed", error);
+      return { ok: false as const, message: "טעינת מועמדים נכשלה. אנא נסה שוב.", sent: 0, skipped: 0 };
+    }
 
     let sent = 0;
     let skipped = 0;
@@ -470,7 +473,10 @@ export const getRecentIntegrationFailures = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(30);
 
-    if (error) return { ok: false as const, message: error.message, failures: [] };
+    if (error) {
+      console.error("[automation-agents] failures query failed", error);
+      return { ok: false as const, message: "טעינת השגיאות נכשלה. אנא נסה שוב.", failures: [] };
+    }
 
     const failures = (rows ?? []).map(parseIntegrationFailureRow);
     return { ok: true as const, failures };

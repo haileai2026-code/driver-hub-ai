@@ -182,7 +182,8 @@ export const applyHaileAiOperation = createServerFn({ method: "POST" })
         .eq("id", data.candidateId);
 
       if (candidateError) {
-        return { ok: false as const, message: candidateError.message };
+        console.error("[haile-ai] candidate update failed", candidateError);
+        return { ok: false as const, message: "עדכון המועמד נכשל. אנא נסה שוב." };
       }
     }
 
@@ -197,7 +198,8 @@ export const applyHaileAiOperation = createServerFn({ method: "POST" })
     });
 
     if (logError) {
-      return { ok: false as const, message: logError.message };
+      console.error("[haile-ai] log insert failed", logError);
+      return { ok: false as const, message: "רישום הפעולה ביומן נכשל. אנא נסה שוב." };
     }
 
     return {

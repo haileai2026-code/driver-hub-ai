@@ -55,7 +55,10 @@ async function callGmail<T>(path: string, init?: { method?: string; body?: unkno
   });
 
   const text = await response.text();
-  if (!response.ok) throw new Error(`Gmail API call failed [${response.status}]: ${text}`);
+  if (!response.ok) {
+    console.error(`[google-agent] Gmail API call failed [${response.status}]: ${text}`);
+    throw new Error("Gmail request failed");
+  }
   return text ? (JSON.parse(text) as T) : ({} as T);
 }
 
