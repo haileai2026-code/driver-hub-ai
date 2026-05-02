@@ -4099,6 +4099,30 @@ function IntegrationFailuresPanel({ isAuthorized }: { isAuthorized: boolean }) {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-xs font-bold text-muted-foreground">סוג שגיאה:</label>
+        <select
+          value={errorTypeFilter}
+          onChange={(e) => setErrorTypeFilter(e.target.value as FailureErrorType)}
+          className="rounded-md border border-border bg-surface px-2 py-1 text-xs font-bold"
+        >
+          {(Object.keys(FAILURE_ERROR_TYPE_LABELS) as FailureErrorType[]).map((t) => (
+            <option key={t} value={t}>
+              {FAILURE_ERROR_TYPE_LABELS[t]}
+              {t !== "all" && errorTypeCounts[t] ? ` (${errorTypeCounts[t]})` : ""}
+            </option>
+          ))}
+        </select>
+        {errorTypeFilter !== "all" && (
+          <button
+            type="button"
+            onClick={() => setErrorTypeFilter("all")}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            נקה
+          </button>
+        )}
+
       {statusMsg && (
         <div
           className={cn(
