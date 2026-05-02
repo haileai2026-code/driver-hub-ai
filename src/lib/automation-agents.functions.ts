@@ -225,6 +225,9 @@ export const sendTestNotification = createServerFn({ method: "POST" })
       if (data.channel === "telegram") {
         const tgKey = process.env.TELEGRAM_API_KEY;
         if (!lovableKey || !tgKey) throw new Error("Telegram לא מחובר.");
+        const chatId = data.target.trim() || (await getSavedBenyTelegramChatId());
+        if (!chatId)
+          throw new Error("לא הוגדר Telegram Chat ID. הזן יעד או שמור Chat ID בהגדרות פרופיל מנכ״ל.");
         const res = await fetch(
           "https://connector-gateway.lovable.dev/telegram/sendMessage",
           {
@@ -234,7 +237,7 @@ export const sendTestNotification = createServerFn({ method: "POST" })
               "X-Connection-Api-Key": tgKey,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ chat_id: data.target, text: data.message }),
+            body: JSON.stringify({ chat_id: chatId, text: data.message }),
           },
         );
         const json = (await res.json().catch(() => ({}))) as {
@@ -245,11 +248,11 @@ export const sendTestNotification = createServerFn({ method: "POST" })
           throw new Error(json.description ?? `Telegram שגיאה ${res.status}`);
         await logIntegrationEvent({
           channel: "telegram",
-          target: data.target,
+          target: chatId,
           message: data.message,
           status: "sent",
         });
-        return { ok: true as const, message: `הודעה נשלחה ל-Telegram (${data.target}).` };
+        return { ok: true as const, message: `הודעה נשלחה ל-Telegram (${chatId}).` };
       }
 
       // whatsapp
