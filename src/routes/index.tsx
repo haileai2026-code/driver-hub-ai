@@ -3426,6 +3426,7 @@ function SettingsPage({
       const res = await getAppSettings({ data: { accessToken } });
       if (cancelled || !res.ok) return;
       setBenyWhatsapp(res.settings.benyWhatsapp);
+      setBenyTelegramChatId(res.settings.benyTelegramChatId ?? "");
       setSummaryTime(res.settings.morningSummaryTime);
       setSummaryEnabled(res.settings.morningSummaryEnabled);
       setUpdatedAt(res.settings.updatedAt);
