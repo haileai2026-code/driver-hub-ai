@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
-import { sendWhatsAppText } from "@/lib/whatsapp.server";
+import { sendTelegramText } from "@/lib/telegram.server";
 
 export const Route = createFileRoute("/api/public/hooks/morning-summary")({
   server: {
