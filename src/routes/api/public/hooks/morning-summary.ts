@@ -51,8 +51,8 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           if (summary.enabled === false) {
             return json({ ok: true, skipped: "summary disabled" });
           }
-          if (!beny.phone) {
-            return json({ ok: false, error: "Beny WhatsApp not configured." }, 400);
+          if (!beny.chat_id) {
+            return json({ ok: false, error: "Beny Telegram chat_id not configured." }, 400);
           }
 
           // Only send within a 5-minute window of the configured Asia/Jerusalem time.
