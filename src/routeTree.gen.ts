@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api.whatsapp.webhook'
+import { Route as ApiPublicHooksTelegramPollRouteImport } from './routes/api/public/hooks/telegram-poll'
 import { Route as ApiPublicHooksMorningSummaryRouteImport } from './routes/api/public/hooks/morning-summary'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,12 @@ const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
   path: '/api/whatsapp/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksTelegramPollRoute =
+  ApiPublicHooksTelegramPollRouteImport.update({
+    id: '/api/public/hooks/telegram-poll',
+    path: '/api/public/hooks/telegram-poll',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksMorningSummaryRoute =
   ApiPublicHooksMorningSummaryRouteImport.update({
     id: '/api/public/hooks/morning-summary',
@@ -34,34 +41,47 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
+  '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
+  '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
+  '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/whatsapp/webhook' | '/api/public/hooks/morning-summary'
+  fullPaths:
+    | '/'
+    | '/api/whatsapp/webhook'
+    | '/api/public/hooks/morning-summary'
+    | '/api/public/hooks/telegram-poll'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/whatsapp/webhook' | '/api/public/hooks/morning-summary'
+  to:
+    | '/'
+    | '/api/whatsapp/webhook'
+    | '/api/public/hooks/morning-summary'
+    | '/api/public/hooks/telegram-poll'
   id:
     | '__root__'
     | '/'
     | '/api/whatsapp/webhook'
     | '/api/public/hooks/morning-summary'
+    | '/api/public/hooks/telegram-poll'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   ApiPublicHooksMorningSummaryRoute: typeof ApiPublicHooksMorningSummaryRoute
+  ApiPublicHooksTelegramPollRoute: typeof ApiPublicHooksTelegramPollRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -80,6 +100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/telegram-poll': {
+      id: '/api/public/hooks/telegram-poll'
+      path: '/api/public/hooks/telegram-poll'
+      fullPath: '/api/public/hooks/telegram-poll'
+      preLoaderRoute: typeof ApiPublicHooksTelegramPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/morning-summary': {
       id: '/api/public/hooks/morning-summary'
       path: '/api/public/hooks/morning-summary'
@@ -94,6 +121,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   ApiPublicHooksMorningSummaryRoute: ApiPublicHooksMorningSummaryRoute,
+  ApiPublicHooksTelegramPollRoute: ApiPublicHooksTelegramPollRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

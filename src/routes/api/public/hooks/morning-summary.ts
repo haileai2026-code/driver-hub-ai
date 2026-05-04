@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
-import { sendWhatsAppText } from "@/lib/whatsapp.server";
+import { sendTelegramText } from "@/lib/telegram.server";
 
 export const Route = createFileRoute("/api/public/hooks/morning-summary")({
   server: {
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           const { data: settingsRows, error: settingsError } = await admin
             .from("app_settings")
             .select("key,value")
-            .in("key", ["beny_whatsapp", "morning_summary"]);
+            .in("key", ["beny_telegram", "morning_summary"]);
 
           if (settingsError) {
             console.error("[morning-summary] settings fetch failed:", settingsError.message);
@@ -42,7 +42,7 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           }
 
           const map = new Map(settingsRows?.map((r) => [r.key, r.value]) ?? []);
-          const beny = (map.get("beny_whatsapp") ?? {}) as { phone?: string };
+          const beny = (map.get("beny_telegram") ?? {}) as { chat_id?: string };
           const summary = (map.get("morning_summary") ?? {}) as {
             time_il?: string;
             enabled?: boolean;
@@ -51,8 +51,8 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           if (summary.enabled === false) {
             return json({ ok: true, skipped: "summary disabled" });
           }
-          if (!beny.phone) {
-            return json({ ok: false, error: "Beny WhatsApp not configured." }, 400);
+          if (!beny.chat_id) {
+            return json({ ok: false, error: "Beny Telegram chat_id not configured." }, 400);
           }
 
           // Only send within a 5-minute window of the configured Asia/Jerusalem time.
@@ -107,9 +107,9 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
             ...Object.entries(stageCounts).map(([k, v]) => `• ${k}: ${v}`),
           ];
 
-          const result = await sendWhatsAppText(beny.phone, lines.join("\n"));
+          const result = await sendTelegramText(beny.chat_id, lines.join("\n"));
           if (!result.ok) {
-            console.error("[morning-summary] WhatsApp send failed:", result.error);
+            console.error("[morning-summary] Telegram send failed:", result.error);
             return json({ ok: false, error: "Notification delivery failed" }, 502);
           }
 
