@@ -168,9 +168,19 @@ async function handleCommand(text: string): Promise<string> {
   return await askAi(text);
 }
 
+const AI_FALLBACK_MESSAGE = [
+  "⚠️ שירות ה-AI אינו זמין כרגע.",
+  "אפשר לנסות שוב בעוד מספר דקות, או להשתמש בפקודות מובנות:",
+  "• סיכום — ספירת מועמדים לפי שלב",
+  "• עזרה — רשימת כל הפקודות",
+].join("\n");
+
 async function askAi(question: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return "מצטערים, שירות ה-AI אינו זמין כעת.";
+  if (!apiKey) {
+    console.error("[telegram-poll] askAi: LOVABLE_API_KEY missing");
+    return AI_FALLBACK_MESSAGE;
+  }
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -187,12 +197,18 @@ async function askAi(question: string): Promise<string> {
         ],
       }),
     });
+    if (!res.ok) {
+      console.error("[telegram-poll] askAi failed:", res.status, await res.text().catch(() => ""));
+      return AI_FALLBACK_MESSAGE;
+    }
     const data = (await res.json().catch(() => ({}))) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
-    return data.choices?.[0]?.message?.content?.trim() ?? "לא הצלחתי לקבל תשובה מה-AI.";
-  } catch {
-    return "שגיאה בפנייה ל-AI.";
+    const reply = data.choices?.[0]?.message?.content?.trim();
+    return reply && reply.length > 0 ? reply : AI_FALLBACK_MESSAGE;
+  } catch (err) {
+    console.error("[telegram-poll] askAi exception:", err);
+    return AI_FALLBACK_MESSAGE;
   }
 }
 
