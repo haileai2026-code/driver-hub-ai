@@ -107,9 +107,9 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
             ...Object.entries(stageCounts).map(([k, v]) => `• ${k}: ${v}`),
           ];
 
-          const result = await sendWhatsAppText(beny.phone, lines.join("\n"));
+          const result = await sendTelegramText(beny.chat_id, lines.join("\n"));
           if (!result.ok) {
-            console.error("[morning-summary] WhatsApp send failed:", result.error);
+            console.error("[morning-summary] Telegram send failed:", result.error);
             return json({ ok: false, error: "Notification delivery failed" }, 502);
           }
 
