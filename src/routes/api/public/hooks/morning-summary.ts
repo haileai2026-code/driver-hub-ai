@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           const { data: settingsRows, error: settingsError } = await admin
             .from("app_settings")
             .select("key,value")
-            .in("key", ["beny_whatsapp", "morning_summary"]);
+            .in("key", ["beny_telegram", "morning_summary"]);
 
           if (settingsError) {
             console.error("[morning-summary] settings fetch failed:", settingsError.message);
@@ -42,7 +42,7 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           }
 
           const map = new Map(settingsRows?.map((r) => [r.key, r.value]) ?? []);
-          const beny = (map.get("beny_whatsapp") ?? {}) as { phone?: string };
+          const beny = (map.get("beny_telegram") ?? {}) as { chat_id?: string };
           const summary = (map.get("morning_summary") ?? {}) as {
             time_il?: string;
             enabled?: boolean;
