@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api.whatsapp.webhook'
+import { Route as ApiPublicHooksWaRemindersRouteImport } from './routes/api/public/hooks/wa-reminders'
 import { Route as ApiPublicHooksTelegramPollRouteImport } from './routes/api/public/hooks/telegram-poll'
 import { Route as ApiPublicHooksMorningSummaryRouteImport } from './routes/api/public/hooks/morning-summary'
 
@@ -24,6 +25,12 @@ const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
   path: '/api/whatsapp/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksWaRemindersRoute =
+  ApiPublicHooksWaRemindersRouteImport.update({
+    id: '/api/public/hooks/wa-reminders',
+    path: '/api/public/hooks/wa-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTelegramPollRoute =
   ApiPublicHooksTelegramPollRouteImport.update({
     id: '/api/public/hooks/telegram-poll',
@@ -42,12 +49,14 @@ export interface FileRoutesByFullPath {
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
   '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
+  '/api/public/hooks/wa-reminders': typeof ApiPublicHooksWaRemindersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
   '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
+  '/api/public/hooks/wa-reminders': typeof ApiPublicHooksWaRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -55,6 +64,7 @@ export interface FileRoutesById {
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/api/public/hooks/morning-summary': typeof ApiPublicHooksMorningSummaryRoute
   '/api/public/hooks/telegram-poll': typeof ApiPublicHooksTelegramPollRoute
+  '/api/public/hooks/wa-reminders': typeof ApiPublicHooksWaRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -63,18 +73,21 @@ export interface FileRouteTypes {
     | '/api/whatsapp/webhook'
     | '/api/public/hooks/morning-summary'
     | '/api/public/hooks/telegram-poll'
+    | '/api/public/hooks/wa-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/whatsapp/webhook'
     | '/api/public/hooks/morning-summary'
     | '/api/public/hooks/telegram-poll'
+    | '/api/public/hooks/wa-reminders'
   id:
     | '__root__'
     | '/'
     | '/api/whatsapp/webhook'
     | '/api/public/hooks/morning-summary'
     | '/api/public/hooks/telegram-poll'
+    | '/api/public/hooks/wa-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -82,6 +95,7 @@ export interface RootRouteChildren {
   ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   ApiPublicHooksMorningSummaryRoute: typeof ApiPublicHooksMorningSummaryRoute
   ApiPublicHooksTelegramPollRoute: typeof ApiPublicHooksTelegramPollRoute
+  ApiPublicHooksWaRemindersRoute: typeof ApiPublicHooksWaRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -98,6 +112,13 @@ declare module '@tanstack/react-router' {
       path: '/api/whatsapp/webhook'
       fullPath: '/api/whatsapp/webhook'
       preLoaderRoute: typeof ApiWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/wa-reminders': {
+      id: '/api/public/hooks/wa-reminders'
+      path: '/api/public/hooks/wa-reminders'
+      fullPath: '/api/public/hooks/wa-reminders'
+      preLoaderRoute: typeof ApiPublicHooksWaRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/telegram-poll': {
@@ -122,16 +143,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   ApiPublicHooksMorningSummaryRoute: ApiPublicHooksMorningSummaryRoute,
   ApiPublicHooksTelegramPollRoute: ApiPublicHooksTelegramPollRoute,
+  ApiPublicHooksWaRemindersRoute: ApiPublicHooksWaRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
