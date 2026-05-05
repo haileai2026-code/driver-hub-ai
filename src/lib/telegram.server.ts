@@ -2,6 +2,8 @@
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
 
+export const BENY_CHAT_ID = "5039079360";
+
 export type TelegramSendResult =
   | { ok: true; messageId: number }
   | { ok: false; error: string; status?: number };
@@ -38,21 +40,21 @@ export async function sendTelegramText(
     body: JSON.stringify({ chat_id: Number(chatIdStr), text }),
   });
 
-  const json = (await res.json().catch(() => ({}))) as {
+  const data = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     description?: string;
     result?: { message_id: number };
   };
 
-  if (!res.ok || json.ok === false) {
+  if (!res.ok || data.ok === false) {
     return {
       ok: false,
       status: res.status,
-      error: json.description ?? `Telegram API error ${res.status}`,
+      error: data.description ?? `Telegram API error ${res.status}`,
     };
   }
 
-  return { ok: true, messageId: json.result?.message_id ?? 0 };
+  return { ok: true, messageId: data.result?.message_id ?? 0 };
 }
 
 export async function getTelegramUpdates(
@@ -90,13 +92,13 @@ export async function getTelegramUpdates(
       allowed_updates: ["message"],
     }),
   });
-  const json = (await res.json().catch(() => ({}))) as {
+  const data = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     result?: unknown;
     description?: string;
   };
-  if (!res.ok || json.ok === false) {
-    return { ok: false, updates: [], error: json.description ?? `HTTP ${res.status}` };
+  if (!res.ok || data.ok === false) {
+    return { ok: false, updates: [], error: data.description ?? `HTTP ${res.status}` };
   }
-  return { ok: true, updates: (json.result ?? []) as never };
+  return { ok: true, updates: (data.result ?? []) as never };
 }

@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
           if (provided !== expectedSecret) {
             return json({ ok: false, error: "Unauthorized" }, 401);
           }
+
           const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
           const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -62,49 +63,73 @@ export const Route = createFileRoute("/api/public/hooks/morning-summary")({
             hour: "2-digit",
             minute: "2-digit",
             hour12: false,
-          }); // "HH:MM"
+          });
           const [th, tm] = targetTime.split(":").map(Number);
           const [nh, nm] = nowIl.split(":").map(Number);
-          const diff = Math.abs((nh * 60 + nm) - (th * 60 + tm));
+          const diff = Math.abs(nh * 60 + nm - (th * 60 + tm));
           if (diff > 5) {
             return json({ ok: true, skipped: `outside window (now ${nowIl}, target ${targetTime})` });
           }
 
-          // Build the morning summary
-          const since = new Date();
-          since.setHours(since.getHours() - 24);
+          // ── Build metrics ────────────────────────────────────────────────
+          const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-          const [{ count: newCandidates }, { count: newLogs }, { data: stages }] =
-            await Promise.all([
-              admin
-                .from("candidates")
-                .select("*", { count: "exact", head: true })
-                .gte("created_at", since.toISOString()),
-              admin
-                .from("operation_logs")
-                .select("*", { count: "exact", head: true })
-                .gte("created_at", since.toISOString()),
-              admin.from("candidates").select("stage"),
-            ]);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const adminAny = admin as any;
+
+          const [
+            { count: newCandidates },
+            { data: stages },
+            { count: testStageCount },
+            { count: awaitingReply },
+          ] = await Promise.all([
+            // New candidates in last 24h
+            admin
+              .from("candidates")
+              .select("*", { count: "exact", head: true })
+              .gte("created_at", since24h),
+
+            // All candidates for pipeline breakdown
+            admin.from("candidates").select("stage"),
+
+            // Test-stage candidates (ready for placement)
+            admin
+              .from("candidates")
+              .select("*", { count: "exact", head: true })
+              .eq("stage", "Test"),
+
+            // Screening conversations with no reply for 24h+
+            adminAny
+              .from("wa_conversations")
+              .select("*", { count: "exact", head: true })
+              .lt("step", 4)
+              .lt("last_message_at", since24h),
+          ]);
 
           const stageCounts = (stages ?? []).reduce<Record<string, number>>((acc, r) => {
-            const s = (r as { stage: string }).stage;
+            const s = (r as { stage: string }).stage ?? "לא ידוע";
             acc[s] = (acc[s] ?? 0) + 1;
             return acc;
           }, {});
 
+          const total = (stages ?? []).length;
           const today = new Date().toLocaleDateString("he-IL", {
             timeZone: "Asia/Jerusalem",
           });
 
+          const stageLines = Object.entries(stageCounts)
+            .sort(([, a], [, b]) => b - a)
+            .map(([k, v]) => `  • ${k}: ${v}`);
+
           const lines = [
-            `☀️ סיכום בוקר – ${today}`,
-            "",
-            `מועמדים חדשים (24 שעות אחרונות): ${newCandidates ?? 0}`,
-            `אינטראקציות חדשות: ${newLogs ?? 0}`,
-            "",
-            "סטטוס מועמדים:",
-            ...Object.entries(stageCounts).map(([k, v]) => `• ${k}: ${v}`),
+            `☀️ סיכום בוקר — ${today}`,
+            ``,
+            `📥 מועמדים חדשים (24 שעות): ${newCandidates ?? 0}`,
+            `⏳ ממתינים לתשובה 24 שעות+: ${awaitingReply ?? 0}`,
+            `🎯 מוכנים למיון (שלב Test): ${testStageCount ?? 0}`,
+            ``,
+            `Pipeline (סה"כ ${total}):`,
+            ...stageLines,
           ];
 
           const result = await sendTelegramText(beny.chat_id, lines.join("\n"));
